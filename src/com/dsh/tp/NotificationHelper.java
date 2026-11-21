@@ -91,7 +91,9 @@ final class NotificationHelper {
         if (Build.VERSION.SDK_INT >= 36) {
             liveStyle(b, lineText);
         }
-        return b.build();
+        Notification n = b.build();
+        MiIsland.attach(n, lineText, line, total);
+        return n;
     }
 
     /** 反射调用 API 36 才有的 ProgressStyle / promoted ongoing，失败就退回普通通知。 */

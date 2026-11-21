@@ -461,6 +461,27 @@ public class MainActivity extends android.app.Activity {
 
     // ---------------------------------------------------------------- 更新
 
+    /** 打开通知开关时顺手探测这台机器支持哪种岛。 */
+    private void probeIsland() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final int protocol = MiIsland.protocol(MainActivity.this);
+                final boolean island = MiIsland.systemSupportsIsland();
+                final boolean focus = MiIsland.hasFocusPermission(MainActivity.this);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        String text = "岛协议 v" + protocol
+                                + (island ? " · 支持超级岛" : " · 无超级岛")
+                                + (focus ? " · 焦点通知已开通" : " · 焦点通知未开通");
+                        toast(text);
+                    }
+                });
+            }
+        }).start();
+    }
+
     private void requestNotifyPermission() {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -1009,6 +1030,7 @@ public class MainActivity extends android.app.Activity {
                         settings.chipNotify(checked);
                         if (checked) {
                             requestNotifyPermission();
+                            probeIsland();
                         }
                     }
                 }));
