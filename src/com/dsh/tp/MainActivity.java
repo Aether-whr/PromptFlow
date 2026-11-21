@@ -62,6 +62,7 @@ public class MainActivity extends android.app.Activity {
 
     private Settings settings;
     private EditText input;
+    private boolean autoScroll;
     private ScrollArrow arrowUp;
     private ScrollArrow arrowDown;
     private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -262,7 +263,7 @@ public class MainActivity extends android.app.Activity {
                     input.post(new Runnable() {
                         @Override
                         public void run() {
-                            updateArrows();
+                            hideArrows();
                         }
                     });
                 }
@@ -308,13 +309,19 @@ public class MainActivity extends android.app.Activity {
         input.setOnScrollChangeListener(new View.OnScrollChangeListener() {
             @Override
             public void onScrollChange(View v, int sx, int sy, int osx, int osy) {
-                updateArrows();
+                if (autoScroll || sy == osy) {
+                    return;
+                }
+                // 向上滑（内容往下走）→ 显示上箭头回顶；向下滑反之
+                showArrowForDirection(sy > osy);
             }
         });
         input.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             @Override
             public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
-                updateArrows();
+                if (!autoScroll) {
+                    hideArrows();
+                }
             }
         });
 
@@ -414,6 +421,7 @@ public class MainActivity extends android.app.Activity {
     }
 
     private void smoothScrollTo(final int target) {
+        autoScroll = true;
         ValueAnimator anim = ValueAnimator.ofInt(input.getScrollY(), target);
         anim.setDuration(380L);
         anim.setInterpolator(new DecelerateInterpolator());
@@ -423,24 +431,31 @@ public class MainActivity extends android.app.Activity {
                 input.scrollTo(0, (Integer) a.getAnimatedValue());
             }
         });
+        anim.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                autoScroll = false;
+                hideArrows();
+            }
+        });
         anim.start();
-        updateArrows();
     }
 
-    private void updateArrows() {
-        if (arrowUp == null || input == null) {
+    /** 只显示和滑动方向对应的那一个箭头。 */
+    private void showArrowForDirection(boolean forward) {
+        if (arrowUp == null) {
             return;
         }
-        int max = maxEditorScroll();
-        int y = input.getScrollY();
-        boolean canUp = y > Ui.dp(this, 6);
-        boolean canDown = y < max - Ui.dp(this, 6);
-        showArrow(arrowUp, canUp);
-        showArrow(arrowDown, canDown);
+        showArrow(arrowUp, forward);
+        showArrow(arrowDown, !forward);
         ui.removeCallbacks(hideArrowsTask);
-        if (canUp || canDown) {
-            ui.postDelayed(hideArrowsTask, 1000L);
-        }
+        ui.postDelayed(hideArrowsTask, 1000L);
+    }
+
+    private void hideArrows() {
+        showArrow(arrowUp, false);
+        showArrow(arrowDown, false);
+        ui.removeCallbacks(hideArrowsTask);
     }
 
     private void showArrow(View arrow, boolean show) {
@@ -499,17 +514,34 @@ public class MainActivity extends android.app.Activity {
         protected void onDraw(Canvas canvas) {
             float w = getWidth();
             float h = getHeight();
-            float r = Math.min(w, h) / 2f - Ui.dp(getContext(), 1);
             float cx = w / 2f;
             float cy = h / 2f;
+            float halo = Ui.dp(getContext(), 9);
+            float r = Math.min(w, h) / 2f - halo * 0.4f;
+
+            // 毛玻璃光晕：外圈渐隐，看起来像把下面的文字模糊了
+            Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+            glow.setShader(new android.graphics.RadialGradient(cx, cy, r + halo,
+                    new int[]{0x66FFFFFF, 0x33FFFFFF, 0x00FFFFFF},
+                    new float[]{0.62f, 0.86f, 1f},
+                    android.graphics.Shader.TileMode.CLAMP));
+            canvas.drawCircle(cx, cy, r + halo, glow);
+
+            // 半透明玻璃底
+            circle.setColor(0xE6FFFFFF);
             canvas.drawCircle(cx, cy, r, circle);
+            ring.setColor(0x33000000);
             canvas.drawCircle(cx, cy, r, ring);
-            float dx = Ui.dp(getContext(), 5);
-            float dy = Ui.dp(getContext(), 4);
-            float ay = up ? cy + dy : cy - dy;
-            float by = up ? cy - dy : cy + dy;
-            canvas.drawLine(cx - dx, ay, cx, by, chevron);
-            canvas.drawLine(cx + dx, ay, cx, by, chevron);
+
+            // 带把的箭头
+            float dx = Ui.dp(getContext(), 4.5f);
+            float dy = Ui.dp(getContext(), 5.5f);
+            float headY = up ? cy - dy : cy + dy;
+            float tailY = up ? cy + dy : cy - dy;
+            canvas.drawLine(cx, tailY, cx, headY, chevron);
+            float wingY = up ? headY + dx : headY - dx;
+            canvas.drawLine(cx - dx, wingY, cx, headY, chevron);
+            canvas.drawLine(cx + dx, wingY, cx, headY, chevron);
         }
     }
 
