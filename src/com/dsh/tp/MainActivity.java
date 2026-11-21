@@ -441,13 +441,13 @@ public class MainActivity extends android.app.Activity {
         anim.start();
     }
 
-    /** 只显示和滑动方向对应的那一个箭头。 */
+    /** 只显示和滑动方向对应的那一个箭头（方向和手势相反：上滑给「继续往下」的提示）。 */
     private void showArrowForDirection(boolean forward) {
         if (arrowUp == null) {
             return;
         }
-        showArrow(arrowUp, forward);
-        showArrow(arrowDown, !forward);
+        showArrow(arrowUp, !forward);
+        showArrow(arrowDown, forward);
         ui.removeCallbacks(hideArrowsTask);
         ui.postDelayed(hideArrowsTask, 1000L);
     }
