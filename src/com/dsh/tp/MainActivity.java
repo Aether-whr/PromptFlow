@@ -50,6 +50,8 @@ public class MainActivity extends android.app.Activity {
     private Settings settings;
     private EditText input;
     private TextView counter;
+    private TextView libraryBtn;
+    private AlertDialog libraryDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +71,7 @@ public class MainActivity extends android.app.Activity {
         root.addView(footer());
 
         setContentView(root);
+        updateLibraryCount();
     }
 
     private View header() {
@@ -85,23 +88,23 @@ public class MainActivity extends android.app.Activity {
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView update = new TextView(this);
-        update.setText("更新");
-        update.setTextSize(14);
-        update.setTextColor(ACCENT);
-        update.setGravity(Gravity.CENTER);
-        update.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
-        update.setBackground(Ui.ripple(0xFFE9F0FE, Ui.dp(this, 20), 0x332F6FED));
-        update.setOnClickListener(new View.OnClickListener() {
+        TextView save = new TextView(this);
+        save.setText("保存");
+        save.setTextSize(14);
+        save.setTextColor(ACCENT);
+        save.setGravity(Gravity.CENTER);
+        save.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        save.setBackground(Ui.ripple(0xFFE9F0FE, Ui.dp(this, 20), 0x332F6FED));
+        save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                checkUpdate();
+                saveScript();
             }
         });
         LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         ulp.rightMargin = Ui.dp(this, 8);
-        row.addView(update, ulp);
+        row.addView(save, ulp);
 
         TextView clear = new TextView(this);
         clear.setText("清空");
@@ -205,6 +208,20 @@ public class MainActivity extends android.app.Activity {
                 startPlayback(true);
             }
         });
+        libraryBtn = new TextView(this);
+        libraryBtn.setText("文案");
+        libraryBtn.setTextSize(13);
+        libraryBtn.setTextColor(ACCENT);
+        libraryBtn.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
+        libraryBtn.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 8), 0x222F6FED));
+        libraryBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showLibrary();
+            }
+        });
+        info.addView(libraryBtn);
+
         info.addView(cursorPlay);
 
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
@@ -237,6 +254,159 @@ public class MainActivity extends android.app.Activity {
             return;
         }
         counter.setText("共 " + len + " 字 · 每行约 " + settings.charsPerLine() + " 字");
+    }
+
+    // ---------------------------------------------------------------- 文案
+
+    private void saveScript() {
+        final String text = input.getText().toString();
+        if (text.trim().isEmpty()) {
+            toast("先输入要保存的内容");
+            return;
+        }
+        final EditText name = new EditText(this);
+        name.setText(suggestTitle(text));
+        name.setTextSize(15);
+        name.setSelection(name.getText().length());
+        name.setHint("给这段文案起个名字");
+        FrameLayout box = new FrameLayout(this);
+        int pad = Ui.dp(this, 20);
+        box.setPadding(pad, Ui.dp(this, 4), pad, 0);
+        box.addView(name, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        new AlertDialog.Builder(this)
+                .setTitle("保存文案")
+                .setView(box)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        String title = name.getText().toString().trim();
+                        if (title.isEmpty()) {
+                            title = suggestTitle(text);
+                        }
+                        Scripts.add(MainActivity.this, title, text);
+                        updateLibraryCount();
+                        toast("已保存「" + title + "」");
+                    }
+                })
+                .show();
+    }
+
+    private void showLibrary() {
+        final List<Scripts.Item> items = Scripts.list(this);
+        if (items.isEmpty()) {
+            toast("还没有保存的文案，先点右上角「保存」");
+            return;
+        }
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        int pad = Ui.dp(this, 4);
+        list.setPadding(pad, pad, pad, pad);
+
+        for (int i = 0; i < items.size(); i++) {
+            final Scripts.Item it = items.get(i);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 10));
+            row.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 10), 0x222F6FED));
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    loadScript(it);
+                }
+            });
+
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            TextView title = new TextView(this);
+            title.setText(it.title);
+            title.setTextSize(15);
+            title.setTextColor(INK);
+            title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            TextView prev = new TextView(this);
+            String preview = it.text.replace('\n', ' ').trim();
+            if (preview.length() > 40) {
+                preview = preview.substring(0, 40) + "…";
+            }
+            prev.setText(preview + "  ·  " + fmtTime(it.at));
+            prev.setTextSize(12);
+            prev.setTextColor(MUTED);
+            prev.setMaxLines(1);
+            prev.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            col.addView(title);
+            col.addView(prev);
+            row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            TextView del = new TextView(this);
+            del.setText("删除");
+            del.setTextSize(13);
+            del.setTextColor(0xFFD14343);
+            del.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6));
+            del.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Scripts.remove(MainActivity.this, it.id);
+                    if (libraryDialog != null) {
+                        libraryDialog.dismiss();
+                    }
+                    updateLibraryCount();
+                    toast("已删除「" + it.title + "」");
+                }
+            });
+            row.addView(del);
+
+            list.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+
+        ScrollView sv = new ScrollView(this);
+        sv.addView(list);
+        libraryDialog = new AlertDialog.Builder(this)
+                .setTitle("我的文案（" + items.size() + "）")
+                .setView(sv)
+                .setNegativeButton("关闭", null)
+                .create();
+        libraryDialog.show();
+    }
+
+    private void loadScript(Scripts.Item it) {
+        input.setText(it.text);
+        settings.text(it.text);
+        input.setSelection(input.getText().length());
+        updateCounter(input.getText().length());
+        if (libraryDialog != null) {
+            libraryDialog.dismiss();
+        }
+        toast("已加载「" + it.title + "」");
+    }
+
+    private void updateLibraryCount() {
+        if (libraryBtn != null) {
+            int n = Scripts.list(this).size();
+            libraryBtn.setText(n > 0 ? "文案 " + n : "文案");
+        }
+    }
+
+    private String suggestTitle(String text) {
+        String first = text.trim().split("\n", 2)[0].trim();
+        if (first.isEmpty()) {
+            first = "未命名";
+        }
+        return first.length() > 12 ? first.substring(0, 12) : first;
+    }
+
+    private static String fmtTime(long at) {
+        if (at <= 0) {
+            return "";
+        }
+        return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(new java.util.Date(at));
+    }
+
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 
     // ---------------------------------------------------------------- 更新
@@ -680,6 +850,21 @@ public class MainActivity extends android.app.Activity {
                         settings.mirror(checked);
                     }
                 }));
+
+        // 检查更新（原来在顶栏的「更新」挪到了这里）
+        TextView updateRow = new TextView(this);
+        updateRow.setText("检查更新 · 当前 " + currentVersion());
+        updateRow.setTextSize(14);
+        updateRow.setTextColor(ACCENT);
+        updateRow.setPadding(0, Ui.dp(this, 18), 0, Ui.dp(this, 6));
+        updateRow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                checkUpdate();
+            }
+        });
+        body.addView(updateRow);
 
         // 预览
         body.addView(sectionLabel("预览"));
