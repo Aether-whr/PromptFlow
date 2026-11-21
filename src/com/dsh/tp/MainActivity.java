@@ -14,6 +14,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -58,12 +60,33 @@ public class MainActivity extends android.app.Activity {
         super.onCreate(savedInstanceState);
         Crash.install(getApplicationContext());
         settings = new Settings(this);
+        edgeToEdge();
 
-        LinearLayout root = new LinearLayout(this);
+        final int pad = Ui.dp(this, 16);
+        final LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(PAGE);
-        int pad = Ui.dp(this, 16);
         root.setPadding(pad, Ui.dp(this, 10), pad, Ui.dp(this, 14));
+        // 画到状态栏后面，再用 insets 把内容让开，避免顶部一条深色带
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                int top = 0;
+                int bottom = 0;
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.graphics.Insets bars = insets.getInsets(
+                            WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    top = bars.top;
+                    bottom = bars.bottom;
+                } else {
+                    top = insets.getSystemWindowInsetTop();
+                    bottom = insets.getSystemWindowInsetBottom();
+                }
+                v.setPadding(pad, Ui.dp(MainActivity.this, 10) + top, pad,
+                        Ui.dp(MainActivity.this, 14) + bottom);
+                return insets;
+            }
+        });
 
         root.addView(header());
         root.addView(inputCard(), new LinearLayout.LayoutParams(
@@ -71,7 +94,38 @@ public class MainActivity extends android.app.Activity {
         root.addView(footer());
 
         setContentView(root);
+        root.requestApplyInsets();
         updateLibraryCount();
+    }
+
+    /** 状态栏透明、内容铺到顶部，图标改成深色。 */
+    private void edgeToEdge() {
+        Window win = getWindow();
+        win.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        win.setStatusBarColor(Color.TRANSPARENT);
+        win.setNavigationBarColor(Color.TRANSPARENT);
+        View decor = win.getDecorView();
+        int flags = decor.getSystemUiVisibility() | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+        if (Build.VERSION.SDK_INT >= 23) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        if (Build.VERSION.SDK_INT >= 26) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        if (Build.VERSION.SDK_INT >= 30) {
+            win.setDecorFitsSystemWindows(false);
+            WindowInsetsController c = win.getInsetsController();
+            if (c != null) {
+                c.setSystemBarsAppearance(
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            flags |= View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        }
+        decor.setSystemUiVisibility(flags);
     }
 
     private View header() {
