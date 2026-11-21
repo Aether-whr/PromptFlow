@@ -2,6 +2,7 @@ package com.dsh.tp;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.content.res.ColorStateList;
@@ -101,7 +102,6 @@ final class Ui {
                                     .setDuration(80L)
                                     .setInterpolator(new DecelerateInterpolator())
                                     .start();
-                            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
                             buzz(v.getContext());
                         }
                         return false;
@@ -120,16 +120,33 @@ final class Ui {
         });
     }
 
+    private static long lastBuzz;
+
     static void buzz(Context c) {
+        lastBuzz = SystemClock.elapsedRealtime();
+        vibrate(c, 20, 220);
+    }
+
+    /** 滑杆专用：慢拖时每格响一次，快拖时按时间间隔合并成每几格一次。 */
+    static void stepBuzz(Context c) {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastBuzz < 45L) {
+            return;
+        }
+        lastBuzz = now;
+        vibrate(c, 12, 180);
+    }
+
+    private static void vibrate(Context c, int ms, int amplitude) {
         try {
             Vibrator v = (Vibrator) c.getSystemService(Context.VIBRATOR_SERVICE);
             if (v == null || !v.hasVibrator()) {
                 return;
             }
             if (Build.VERSION.SDK_INT >= 26) {
-                v.vibrate(VibrationEffect.createOneShot(14, 150));
+                v.vibrate(VibrationEffect.createOneShot(ms, amplitude));
             } else {
-                v.vibrate(14);
+                v.vibrate(ms);
             }
         } catch (Throwable ignored) {
         }

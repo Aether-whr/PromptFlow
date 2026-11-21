@@ -984,7 +984,7 @@ public class MainActivity extends android.app.Activity {
             @Override
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 if (fromUser) {
-                    Ui.buzz(MainActivity.this);
+                    Ui.stepBuzz(MainActivity.this);
                 }
                 settings.size(progress + Settings.SIZE_MIN);
                 refreshSizeLabel();
@@ -1013,7 +1013,7 @@ public class MainActivity extends android.app.Activity {
         speedBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                Ui.buzz(MainActivity.this);
+                Ui.stepBuzz(MainActivity.this);
                 settings.speed(progress + 1);
                 refreshSpeedLabel();
             }
@@ -1042,7 +1042,7 @@ public class MainActivity extends android.app.Activity {
                 if (!fromUser) {
                     return;
                 }
-                Ui.buzz(MainActivity.this);
+                Ui.stepBuzz(MainActivity.this);
                 settings.overlaySpeed(progress + 1);
                 overlaySpeedLabel.setText("悬浮窗速度 " + (progress + 1) + " 字/秒");
             }
@@ -1071,7 +1071,7 @@ public class MainActivity extends android.app.Activity {
                 if (!fromUser) {
                     return;
                 }
-                Ui.buzz(MainActivity.this);
+                Ui.stepBuzz(MainActivity.this);
                 int pct = progress + 60;
                 settings.capsuleScale(pct / 100f);
                 capsuleLabel.setText("胶囊大小 " + pct + "%");
