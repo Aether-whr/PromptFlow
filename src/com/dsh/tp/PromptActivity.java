@@ -126,6 +126,7 @@ public class PromptActivity extends Activity implements PromptView.Listener {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
 
         setContentView(root);
+        Ui.bounceAll(root);
     }
 
     private void applyImmersive() {

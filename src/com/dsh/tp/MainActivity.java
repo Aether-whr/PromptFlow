@@ -96,6 +96,7 @@ public class MainActivity extends android.app.Activity {
         setContentView(root);
         root.requestApplyInsets();
         updateLibraryCount();
+        Ui.bounceAll(root);
     }
 
     /** 状态栏透明、内容铺到顶部，图标改成深色。 */

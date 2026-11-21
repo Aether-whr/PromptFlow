@@ -358,6 +358,7 @@ final class OverlayPlayer implements PromptView.Listener {
                 }
             }
         });
+        Ui.bounceAll(root);
     }
 
     private static int clamp(int v, int lo, int hi) {

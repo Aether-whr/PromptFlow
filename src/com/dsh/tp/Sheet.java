@@ -21,6 +21,7 @@ final class Sheet {
 
     private final Activity activity;
     private final Dialog dialog;
+    private final LinearLayout panel;
     private final LinearLayout body;
     private final LinearLayout buttons;
 
@@ -34,7 +35,7 @@ final class Sheet {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         int pad = Ui.dp(a, 20);
-        LinearLayout panel = new LinearLayout(a);
+        panel = new LinearLayout(a);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setBackground(Ui.round(0xFFFFFFFF, Ui.dp(a, 22)));
         panel.setPadding(pad, Ui.dp(a, 16), pad, Ui.dp(a, 14));
@@ -154,6 +155,7 @@ final class Sheet {
     }
 
     void show() {
+        Ui.bounceAll(panel);
         dialog.show();
         Window w = dialog.getWindow();
         if (w != null) {

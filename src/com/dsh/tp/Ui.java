@@ -1,13 +1,20 @@
 package com.dsh.tp;
 
 import android.content.Context;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.util.TypedValue;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 
 /** 一些画界面用的小工具。 */
 final class Ui {
@@ -60,6 +67,71 @@ final class Ui {
             ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
             lp.setMargins(l, t, r, b);
             v.setLayoutParams(lp);
+        }
+    }
+
+    /** 给整棵界面树上所有可点控件加点按回弹 + 轻振动。 */
+    static void bounceAll(View root) {
+        if (root == null) {
+            return;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                bounceAll(group.getChildAt(i));
+            }
+            return;
+        }
+        if (!root.isClickable()) {
+            return;
+        }
+        if (root instanceof android.widget.Switch
+                || root instanceof android.widget.SeekBar
+                || root instanceof android.widget.EditText) {
+            return;
+        }
+        root.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        if (v.isEnabled()) {
+                            v.animate().cancel();
+                            v.animate().scaleX(0.93f).scaleY(0.93f)
+                                    .setDuration(80L)
+                                    .setInterpolator(new DecelerateInterpolator())
+                                    .start();
+                            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                            buzz(v.getContext());
+                        }
+                        return false;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        v.animate().cancel();
+                        v.animate().scaleX(1f).scaleY(1f)
+                                .setDuration(220L)
+                                .setInterpolator(new OvershootInterpolator(2.4f))
+                                .start();
+                        return false;
+                    default:
+                        return false;
+                }
+            }
+        });
+    }
+
+    static void buzz(Context c) {
+        try {
+            Vibrator v = (Vibrator) c.getSystemService(Context.VIBRATOR_SERVICE);
+            if (v == null || !v.hasVibrator()) {
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                v.vibrate(VibrationEffect.createOneShot(14, 150));
+            } else {
+                v.vibrate(14);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
