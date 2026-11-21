@@ -93,6 +93,36 @@ final class Sheet {
         return this;
     }
 
+    /** 正文说明文字，返回引用方便更新（下载进度）。 */
+    TextView addText(String text) {
+        TextView t = new TextView(activity);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setTextColor(0xFF5A6070);
+        t.setLineSpacing(Ui.dp(activity, 3), 1f);
+        add(t);
+        return t;
+    }
+
+    boolean isShowing() {
+        return dialog.isShowing();
+    }
+
+    Sheet cancel(String label, final Runnable action) {
+        TextView b = button(label, false);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (action != null) {
+                    action.run();
+                }
+                dialog.dismiss();
+            }
+        });
+        buttons.addView(b, btnParams());
+        return this;
+    }
+
     Sheet text(String text) {
         TextView t = new TextView(activity);
         t.setText(text);

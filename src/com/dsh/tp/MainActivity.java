@@ -2,9 +2,12 @@ package com.dsh.tp;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -18,6 +21,7 @@ import android.os.Looper;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.text.Editable;
+import android.text.Layout;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
@@ -25,6 +29,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
 import android.view.inputmethod.InputMethodManager;
@@ -57,6 +62,16 @@ public class MainActivity extends android.app.Activity {
 
     private Settings settings;
     private EditText input;
+    private ScrollArrow arrowUp;
+    private ScrollArrow arrowDown;
+    private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable hideArrowsTask = new Runnable() {
+        @Override
+        public void run() {
+            showArrow(arrowUp, false);
+            showArrow(arrowDown, false);
+        }
+    };
     private TextView counter;
     private TextView libraryBtn;
     private Sheet librarySheet;
@@ -243,6 +258,14 @@ public class MainActivity extends android.app.Activity {
             @Override
             public void onTextChanged(CharSequence s, int a, int b, int c) {
                 updateCounter(s.length());
+                if (input != null) {
+                    input.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateArrows();
+                        }
+                    });
+                }
             }
 
             @Override
@@ -251,6 +274,49 @@ public class MainActivity extends android.app.Activity {
         });
         card.addView(input, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        int arrow = Ui.dp(this, 36);
+        arrowUp = new ScrollArrow(this, true);
+        FrameLayout.LayoutParams upLp = new FrameLayout.LayoutParams(arrow, arrow,
+                Gravity.TOP | Gravity.END);
+        upLp.topMargin = Ui.dp(this, 10);
+        upLp.rightMargin = Ui.dp(this, 10);
+        card.addView(arrowUp, upLp);
+
+        arrowDown = new ScrollArrow(this, false);
+        FrameLayout.LayoutParams downLp = new FrameLayout.LayoutParams(arrow, arrow,
+                Gravity.BOTTOM | Gravity.END);
+        downLp.bottomMargin = Ui.dp(this, 10);
+        downLp.rightMargin = Ui.dp(this, 10);
+        card.addView(arrowDown, downLp);
+
+        View.OnClickListener toTop = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                smoothScrollTo(0);
+            }
+        };
+        View.OnClickListener toBottom = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                smoothScrollTo(maxEditorScroll());
+            }
+        };
+        arrowUp.setOnClickListener(toTop);
+        arrowDown.setOnClickListener(toBottom);
+
+        input.setOnScrollChangeListener(new View.OnScrollChangeListener() {
+            @Override
+            public void onScrollChange(View v, int sx, int sy, int osx, int osy) {
+                updateArrows();
+            }
+        });
+        input.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                updateArrows();
+            }
+        });
 
         Ui.margins(card, 0, 0, 0, Ui.dp(this, 12));
         return card;
@@ -333,6 +399,118 @@ public class MainActivity extends android.app.Activity {
             return;
         }
         counter.setText("共 " + len + " 字 · 每行约 " + settings.charsPerLine() + " 字");
+    }
+
+    // ---------------------------------------------------------------- 输入框回顶/触底箭头
+
+    private int maxEditorScroll() {
+        Layout layout = input.getLayout();
+        if (layout == null) {
+            return 0;
+        }
+        int content = layout.getLineTop(Math.max(1, input.getLineCount()))
+                + input.getTotalPaddingTop() + input.getTotalPaddingBottom();
+        return Math.max(0, content - input.getHeight());
+    }
+
+    private void smoothScrollTo(final int target) {
+        ValueAnimator anim = ValueAnimator.ofInt(input.getScrollY(), target);
+        anim.setDuration(380L);
+        anim.setInterpolator(new DecelerateInterpolator());
+        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                input.scrollTo(0, (Integer) a.getAnimatedValue());
+            }
+        });
+        anim.start();
+        updateArrows();
+    }
+
+    private void updateArrows() {
+        if (arrowUp == null || input == null) {
+            return;
+        }
+        int max = maxEditorScroll();
+        int y = input.getScrollY();
+        boolean canUp = y > Ui.dp(this, 6);
+        boolean canDown = y < max - Ui.dp(this, 6);
+        showArrow(arrowUp, canUp);
+        showArrow(arrowDown, canDown);
+        ui.removeCallbacks(hideArrowsTask);
+        if (canUp || canDown) {
+            ui.postDelayed(hideArrowsTask, 1000L);
+        }
+    }
+
+    private void showArrow(View arrow, boolean show) {
+        if (arrow == null) {
+            return;
+        }
+        if (show) {
+            if (arrow.getVisibility() != View.VISIBLE) {
+                arrow.setVisibility(View.VISIBLE);
+                arrow.setAlpha(0f);
+            }
+            arrow.animate().cancel();
+            arrow.animate().alpha(1f).setDuration(180L)
+                    .setInterpolator(new LinearInterpolator()).start();
+        } else {
+            if (arrow.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            arrow.animate().cancel();
+            arrow.animate().alpha(0f).setDuration(220L)
+                    .setInterpolator(new LinearInterpolator())
+                    .withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            arrow.setVisibility(View.GONE);
+                        }
+                    }).start();
+        }
+    }
+
+    /** 输入框右下/右上角的小圆箭头。 */
+    private final class ScrollArrow extends View {
+        private final boolean up;
+        private final Paint circle = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint chevron = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        ScrollArrow(Context c, boolean up) {
+            super(c);
+            this.up = up;
+            circle.setColor(0xFFFFFFFF);
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(Ui.dp(c, 1));
+            ring.setColor(0xFFE1E4EA);
+            chevron.setStyle(Paint.Style.STROKE);
+            chevron.setStrokeWidth(Ui.dp(c, 2));
+            chevron.setStrokeCap(Paint.Cap.ROUND);
+            chevron.setColor(0xFF2F6FED);
+            setElevation(Ui.dp(c, 4));
+            setClickable(true);
+            setVisibility(View.GONE);
+            setAlpha(0f);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            float w = getWidth();
+            float h = getHeight();
+            float r = Math.min(w, h) / 2f - Ui.dp(getContext(), 1);
+            float cx = w / 2f;
+            float cy = h / 2f;
+            canvas.drawCircle(cx, cy, r, circle);
+            canvas.drawCircle(cx, cy, r, ring);
+            float dx = Ui.dp(getContext(), 5);
+            float dy = Ui.dp(getContext(), 4);
+            float ay = up ? cy + dy : cy - dy;
+            float by = up ? cy - dy : cy + dy;
+            canvas.drawLine(cx - dx, ay, cx, by, chevron);
+            canvas.drawLine(cx + dx, ay, cx, by, chevron);
+        }
     }
 
     // ---------------------------------------------------------------- 文案
@@ -526,12 +704,10 @@ public class MainActivity extends android.app.Activity {
     }
 
     private void checkUpdate() {
-        final AlertDialog checking = new AlertDialog.Builder(this)
-                .setTitle("检查更新")
-                .setMessage("正在查询 GitHub 上的最新版本…")
-                .setCancelable(false)
-                .create();
-        checking.show();
+        final Sheet sheet = Sheet.create(this, "检查更新");
+        sheet.addText("正在查询 GitHub 上的最新版本…");
+        sheet.cancel("取消");
+        sheet.show();
         final Handler handler = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
             @Override
@@ -543,7 +719,10 @@ public class MainActivity extends android.app.Activity {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
-                                checking.dismiss();
+                                if (!sheet.isShowing()) {
+                                    return;
+                                }
+                                sheet.dismiss();
                                 if (error != null) {
                                     alert("检查更新失败", error);
                                     return;
@@ -561,17 +740,17 @@ public class MainActivity extends android.app.Activity {
                                 if (body.length() > 600) {
                                     body = body.substring(0, 600) + "…";
                                 }
-                                new AlertDialog.Builder(MainActivity.this)
-                                        .setTitle("发现新版本 " + tag)
-                                        .setMessage(body.isEmpty() ? "是否下载并安装？" : body + "\n\n是否下载并安装？")
-                                        .setNegativeButton("以后再说", null)
-                                        .setPositiveButton("下载并安装", new android.content.DialogInterface.OnClickListener() {
-                                            @Override
-                                            public void onClick(android.content.DialogInterface d, int w) {
-                                                startUpdate(url, apiUrl);
-                                            }
-                                        })
-                                        .show();
+                                final Sheet found = Sheet.create(MainActivity.this, "发现新版本 " + tag);
+                                found.addText(body.isEmpty() ? "是否下载并安装？" : body);
+                                found.cancel("以后再说");
+                                found.primary("下载并安装", new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        found.dismiss();
+                                        startUpdate(url, apiUrl);
+                                    }
+                                });
+                                found.show();
                             }
                         });
                     }
@@ -582,31 +761,36 @@ public class MainActivity extends android.app.Activity {
 
     private void startUpdate(final String url, final String apiUrl) {
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
-            new AlertDialog.Builder(this)
-                    .setTitle("需要安装权限")
-                    .setMessage("系统会打开设置页，请允许「提词器」安装未知应用，然后回来再点一次「更新」。")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("去设置", new android.content.DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(android.content.DialogInterface d, int w) {
-                            try {
-                                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                        Uri.parse("package:" + getPackageName())));
-                            } catch (Exception e) {
-                                alert("打开设置失败", String.valueOf(e.getMessage()));
-                            }
-                        }
-                    })
-                    .show();
+            final Sheet perm = Sheet.create(this, "需要安装权限");
+            perm.addText("系统会打开设置页，请允许「提词器」安装未知应用，然后回来再点一次「更新」。");
+            perm.cancel("取消");
+            perm.primary("去设置", new Runnable() {
+                @Override
+                public void run() {
+                    perm.dismiss();
+                    try {
+                        startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + getPackageName())));
+                    } catch (Exception e) {
+                        alert("打开设置失败", String.valueOf(e.getMessage()));
+                    }
+                }
+            });
+            perm.show();
             return;
         }
 
-        final AlertDialog progress = new AlertDialog.Builder(this)
-                .setTitle("正在下载更新")
-                .setMessage("0%")
-                .setCancelable(false)
-                .create();
-        progress.show();
+        final boolean[] stopped = {false};
+        final Sheet progressSheet = Sheet.create(this, "正在下载更新");
+        final TextView percent = progressSheet.addText("0%");
+        progressSheet.cancel("取消", new Runnable() {
+            @Override
+            public void run() {
+                stopped[0] = true;
+            }
+        });
+        progressSheet.show();
+
         final Handler handler = new Handler(Looper.getMainLooper());
         final File dest = new File(getCacheDir(), "update.apk");
         new Thread(new Runnable() {
@@ -615,11 +799,13 @@ public class MainActivity extends android.app.Activity {
                 try {
                     Updater.download(url, apiUrl, dest, new Updater.Progress() {
                         @Override
-                        public void onProgress(final int percent) {
+                        public void onProgress(final int pct) {
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    progress.setMessage(percent + "%");
+                                    if (progressSheet.isShowing()) {
+                                        percent.setText(pct + "%");
+                                    }
                                 }
                             });
                         }
@@ -627,16 +813,20 @@ public class MainActivity extends android.app.Activity {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            progress.dismiss();
-                            installApk(dest);
+                            progressSheet.dismiss();
+                            if (!stopped[0]) {
+                                installApk(dest);
+                            }
                         }
                     });
                 } catch (final Exception e) {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            progress.dismiss();
-                            alert("下载失败", String.valueOf(e.getMessage()));
+                            progressSheet.dismiss();
+                            if (!stopped[0]) {
+                                alert("下载失败", String.valueOf(e.getMessage()));
+                            }
                         }
                     });
                 }
@@ -688,11 +878,10 @@ public class MainActivity extends android.app.Activity {
     }
 
     private void alert(String title, String message) {
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("知道了", null)
-                .show();
+        Sheet sheet = Sheet.create(this, title);
+        sheet.addText(message);
+        sheet.done("知道了");
+        sheet.show();
     }
 
     /** 清空编辑框里的内容，先确认一下免得误触。 */
