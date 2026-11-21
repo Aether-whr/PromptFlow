@@ -37,6 +37,7 @@ final class OverlayPlayer implements PromptView.Listener {
     private final LinearLayout controls;
     private final TextView playBtn;
     private final TextView posLabel;
+    private TextView closeBtn;
     private final SeekBar speedBar;
     private final SeekBar posBar;
 
@@ -68,7 +69,7 @@ final class OverlayPlayer implements PromptView.Listener {
     private final Runnable hideTask = new Runnable() {
         @Override
         public void run() {
-            controls.setVisibility(View.GONE);
+            setChromeVisible(false);
         }
     };
 
@@ -105,7 +106,8 @@ final class OverlayPlayer implements PromptView.Listener {
         root.addView(prompt, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        TextView close = new TextView(ctx);
+        closeBtn = new TextView(ctx);
+        TextView close = closeBtn;
         close.setText("关闭");
         close.setTextSize(11);
         close.setTextColor((fg & 0x00FFFFFF) | 0xDD000000);
@@ -262,6 +264,7 @@ final class OverlayPlayer implements PromptView.Listener {
         cp.rightMargin = Ui.dp(ctx, 2);
         cp.bottomMargin = Ui.dp(ctx, 2);
         root.addView(controls, cp);
+        closeBtn.setVisibility(View.GONE);
 
         int type = Build.VERSION.SDK_INT >= 26
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -397,12 +400,20 @@ final class OverlayPlayer implements PromptView.Listener {
 
     private void onTap() {
         if (controls.getVisibility() == View.VISIBLE) {
-            controls.setVisibility(View.GONE);
+            setChromeVisible(false);
             handler.removeCallbacks(hideTask);
         } else {
-            controls.setVisibility(View.VISIBLE);
+            setChromeVisible(true);
             updatePlayLabel();
             scheduleHide();
+        }
+    }
+
+    /** 控制条和关闭按钮一起出现、一起收起。 */
+    private void setChromeVisible(boolean visible) {
+        controls.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (closeBtn != null) {
+            closeBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
 
