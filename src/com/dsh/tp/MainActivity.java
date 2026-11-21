@@ -209,7 +209,7 @@ public class MainActivity extends android.app.Activity {
             }
         });
         libraryBtn = new TextView(this);
-        libraryBtn.setText("文案");
+        libraryBtn.setText("保存的文案");
         libraryBtn.setTextSize(13);
         libraryBtn.setTextColor(ACCENT);
         libraryBtn.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
@@ -364,7 +364,7 @@ public class MainActivity extends android.app.Activity {
         ScrollView sv = new ScrollView(this);
         sv.addView(list);
         libraryDialog = new AlertDialog.Builder(this)
-                .setTitle("我的文案（" + items.size() + "）")
+                .setTitle("保存的文案（" + items.size() + "）")
                 .setView(sv)
                 .setNegativeButton("关闭", null)
                 .create();
@@ -384,8 +384,7 @@ public class MainActivity extends android.app.Activity {
 
     private void updateLibraryCount() {
         if (libraryBtn != null) {
-            int n = Scripts.list(this).size();
-            libraryBtn.setText(n > 0 ? "文案 " + n : "文案");
+            libraryBtn.setText("保存的文案");
         }
     }
 
