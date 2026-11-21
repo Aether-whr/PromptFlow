@@ -53,7 +53,7 @@ public class MainActivity extends android.app.Activity {
     private EditText input;
     private TextView counter;
     private TextView libraryBtn;
-    private AlertDialog libraryDialog;
+    private Sheet librarySheet;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -320,31 +320,32 @@ public class MainActivity extends android.app.Activity {
         }
         final EditText name = new EditText(this);
         name.setText(suggestTitle(text));
-        name.setTextSize(15);
+        name.setTextSize(16);
+        name.setSingleLine(true);
+        name.setTextColor(INK);
         name.setSelection(name.getText().length());
         name.setHint("给这段文案起个名字");
-        FrameLayout box = new FrameLayout(this);
-        int pad = Ui.dp(this, 20);
-        box.setPadding(pad, Ui.dp(this, 4), pad, 0);
-        box.addView(name, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle("保存文案")
-                .setView(box)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        String title = name.getText().toString().trim();
-                        if (title.isEmpty()) {
-                            title = suggestTitle(text);
-                        }
-                        Scripts.add(MainActivity.this, title, text);
-                        updateLibraryCount();
-                        toast("已保存「" + title + "」");
-                    }
-                })
-                .show();
+        name.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+        name.setBackground(Ui.roundStroke(0xFFF7F8FA, 0xFFE1E4EA, Ui.dp(this, 1), Ui.dp(this, 12)));
+
+        final Sheet sheet = Sheet.create(this, "保存文案");
+        sheet.add(name);
+        sheet.cancel("取消");
+        sheet.primary("保存", new Runnable() {
+            @Override
+            public void run() {
+                String title = name.getText().toString().trim();
+                if (title.isEmpty()) {
+                    title = suggestTitle(text);
+                }
+                Scripts.add(MainActivity.this, title, text);
+                updateLibraryCount();
+                sheet.dismiss();
+                toast("已保存「" + title + "」");
+            }
+        });
+        sheet.show();
+        sheet.showKeyboard(name);
     }
 
     private void showLibrary() {
@@ -402,8 +403,8 @@ public class MainActivity extends android.app.Activity {
                 @Override
                 public void onClick(View v) {
                     Scripts.remove(MainActivity.this, it.id);
-                    if (libraryDialog != null) {
-                        libraryDialog.dismiss();
+                    if (librarySheet != null) {
+                        librarySheet.dismiss();
                     }
                     updateLibraryCount();
                     toast("已删除「" + it.title + "」");
@@ -415,14 +416,10 @@ public class MainActivity extends android.app.Activity {
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
-        ScrollView sv = new ScrollView(this);
-        sv.addView(list);
-        libraryDialog = new AlertDialog.Builder(this)
-                .setTitle("保存的文案（" + items.size() + "）")
-                .setView(sv)
-                .setNegativeButton("关闭", null)
-                .create();
-        libraryDialog.show();
+        librarySheet = Sheet.create(this, "保存的文案（" + items.size() + "）");
+        librarySheet.addScrollable(list);
+        librarySheet.cancel("关闭");
+        librarySheet.show();
     }
 
     private void loadScript(Scripts.Item it) {
@@ -430,8 +427,8 @@ public class MainActivity extends android.app.Activity {
         settings.text(it.text);
         input.setSelection(input.getText().length());
         updateCounter(input.getText().length());
-        if (libraryDialog != null) {
-            libraryDialog.dismiss();
+        if (librarySheet != null) {
+            librarySheet.dismiss();
         }
         toast("已加载「" + it.title + "」");
     }
@@ -639,19 +636,19 @@ public class MainActivity extends android.app.Activity {
         if (input.getText().length() == 0) {
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("清空输入的内容？")
-                .setMessage("正文会被清空，字号、速度这些设置不受影响。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("清空", new android.content.DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(android.content.DialogInterface d, int which) {
-                        input.setText("");
-                        settings.text("");
-                        input.requestFocus();
-                    }
-                })
-                .show();
+        final Sheet sheet = Sheet.create(this, "清空输入的内容？");
+        sheet.text("正文会被清空，字号、速度这些设置不受影响。");
+        sheet.cancel("取消");
+        sheet.primary("清空", new Runnable() {
+            @Override
+            public void run() {
+                input.setText("");
+                settings.text("");
+                input.requestFocus();
+                sheet.dismiss();
+            }
+        });
+        sheet.show();
     }
 
     private void startPlayback(boolean fromCursor) {
