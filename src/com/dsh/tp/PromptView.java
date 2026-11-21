@@ -320,7 +320,10 @@ class PromptView extends View {
                 });
             }
             postInvalidateOnAnimation();
-            notifyProgress(false);
+            if (listener != null && System.nanoTime() - lastProgressNanos > 120000000L) {
+                lastProgressNanos = System.nanoTime();
+                post(progressTick);
+            }
         } else {
             lastNanos = 0L;
         }
@@ -362,7 +365,10 @@ class PromptView extends View {
                 });
             }
             postInvalidateOnAnimation();
-            notifyProgress(false);
+            if (listener != null && System.nanoTime() - lastProgressNanos > 120000000L) {
+                lastProgressNanos = System.nanoTime();
+                post(progressTick);
+            }
         } else {
             lastNanos = 0L;
         }
@@ -374,6 +380,13 @@ class PromptView extends View {
         canvas.drawText(flat, getWidth() - offset, baselineY, paint);
         canvas.restore();
     }
+
+    private final Runnable progressTick = new Runnable() {
+        @Override
+        public void run() {
+            notifyProgress(true);
+        }
+    };
 
     private void notifyProgress(boolean force) {
         if (listener == null) {

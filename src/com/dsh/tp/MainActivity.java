@@ -759,6 +759,8 @@ public class MainActivity extends android.app.Activity {
     private final List<TextView> modeChips = new ArrayList<>();
     private final List<TextView> playChips = new ArrayList<>();
     private final List<TextView> orientChips = new ArrayList<>();
+    private TextView orientLabel;
+    private LinearLayout orientRow;
     private final List<TextView> fontChips = new ArrayList<>();
     private final List<View> bgDots = new ArrayList<>();
 
@@ -850,14 +852,16 @@ public class MainActivity extends android.app.Activity {
                 public void onClick(View v) {
                     settings.playMode(value);
                     refreshChips(playChips, value, 3);
+                    applyOrientationVisibility();
                 }
             });
             playChips.add(c);
         }
         body.addView(chipRow(playChips));
 
-        // 方向
-        body.addView(sectionLabel("播放方向"));
+        // 方向（只有全屏模式才需要）
+        orientLabel = sectionLabel("播放方向");
+        body.addView(orientLabel);
         orientChips.clear();
         for (int idx = 0; idx < 2; idx++) {
             final int value = idx;
@@ -873,7 +877,9 @@ public class MainActivity extends android.app.Activity {
             });
             orientChips.add(c);
         }
-        body.addView(chipRow(orientChips));
+        orientRow = chipRow(orientChips);
+        body.addView(orientRow);
+        applyOrientationVisibility();
 
         // 字号
         sizeLabel = sectionLabel("");
@@ -1109,6 +1115,16 @@ public class MainActivity extends android.app.Activity {
         Window w2 = dialog.getWindow();
         if (w2 != null) {
             w2.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private void applyOrientationVisibility() {
+        int vis = settings.playMode() == Settings.PLAY_FULLSCREEN ? View.VISIBLE : View.GONE;
+        if (orientLabel != null) {
+            orientLabel.setVisibility(vis);
+        }
+        if (orientRow != null) {
+            orientRow.setVisibility(vis);
         }
     }
 

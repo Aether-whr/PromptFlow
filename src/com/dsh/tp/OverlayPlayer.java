@@ -476,15 +476,20 @@ final class OverlayPlayer implements PromptView.Listener {
         if (settings.chipNotify()) {
             NotificationHelper.update(ctx, prompt.currentLineText(), line, total, fraction);
         }
-        if (posBar == null || seeking) {
+        // 控制条收起来时不做任何 UI 更新，省下每帧的布局开销
+        if (posBar == null || seeking || controls.getVisibility() != View.VISIBLE) {
             return;
         }
-        posBar.setProgress(Math.round(fraction * 1000f));
+        int p = Math.round(fraction * 1000f);
+        if (p != posBar.getProgress()) {
+            posBar.setProgress(p);
+        }
         if (posLabel != null) {
-            if (prompt.horizontal()) {
-                posLabel.setText(Math.round(fraction * 100f) + "%");
-            } else {
-                posLabel.setText("第 " + line + " / " + Math.max(total, 1) + " 行");
+            String label = prompt.horizontal()
+                    ? Math.round(fraction * 100f) + "%"
+                    : "第 " + line + " / " + Math.max(total, 1) + " 行";
+            if (!label.contentEquals(posLabel.getText())) {
+                posLabel.setText(label);
             }
         }
     }
