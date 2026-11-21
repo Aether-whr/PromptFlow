@@ -418,7 +418,7 @@ public class MainActivity extends android.app.Activity {
 
         librarySheet = Sheet.create(this, "保存的文案（" + items.size() + "）");
         librarySheet.addScrollable(list);
-        librarySheet.cancel("关闭");
+        librarySheet.done("关闭");
         librarySheet.show();
     }
 

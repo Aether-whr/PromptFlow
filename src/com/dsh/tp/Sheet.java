@@ -126,6 +126,19 @@ final class Sheet {
         return this;
     }
 
+    /** 蓝色按钮，只负责关掉弹窗。 */
+    Sheet done(String label) {
+        TextView b = button(label, true);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        buttons.addView(b, btnParams());
+        return this;
+    }
+
     Sheet primary(String label, final Runnable action) {
         TextView b = button(label, true);
         b.setOnClickListener(new View.OnClickListener() {
