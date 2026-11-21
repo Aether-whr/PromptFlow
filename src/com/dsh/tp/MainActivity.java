@@ -1,0 +1,595 @@
+package com.dsh.tp;
+
+import android.app.Dialog;
+import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.SeekBar;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/** 编辑页：写内容、改设置、开始播放。 */
+public class MainActivity extends android.app.Activity {
+
+    private static final int PAGE = 0xFFF4F5F7;
+    private static final int CARD = 0xFFFFFFFF;
+    private static final int INK = 0xFF16181D;
+    private static final int MUTED = 0xFF848A94;
+    private static final int ACCENT = 0xFF2F6FED;
+    private static final int TRACK = 0xFFE3E6EB;
+
+    private Settings settings;
+    private EditText input;
+    private TextView counter;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Crash.install(getApplicationContext());
+        settings = new Settings(this);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(PAGE);
+        int pad = Ui.dp(this, 16);
+        root.setPadding(pad, Ui.dp(this, 10), pad, Ui.dp(this, 14));
+
+        root.addView(header());
+        root.addView(inputCard(), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        root.addView(footer());
+
+        setContentView(root);
+    }
+
+    private View header() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Ui.dp(this, 2), 0, 0, Ui.dp(this, 8));
+
+        TextView title = new TextView(this);
+        title.setText("提词器");
+        title.setTextSize(24);
+        title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        title.setTextColor(INK);
+        row.addView(title, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView gear = new TextView(this);
+        gear.setText("设置");
+        gear.setTextSize(14);
+        gear.setTextColor(0xFF4A5160);
+        gear.setGravity(Gravity.CENTER);
+        gear.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        gear.setBackground(Ui.ripple(0xFFFFFFFF, Ui.dp(this, 20), 0x22000000));
+        gear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettings();
+            }
+        });
+        row.addView(gear);
+        return row;
+    }
+
+    private View inputCard() {
+        FrameLayout card = new FrameLayout(this);
+        card.setBackground(Ui.roundStroke(CARD, 0xFFE1E4EA, Ui.dp(this, 1), Ui.dp(this, 18)));
+
+        input = new EditText(this);
+        input.setBackground(null);
+        input.setGravity(Gravity.TOP | Gravity.START);
+        input.setTextSize(17);
+        input.setTextColor(INK);
+        input.setHintTextColor(0xFFABB1BB);
+        input.setHint("在这里输入或粘贴要念的内容…");
+        input.setLineSpacing(Ui.dp(this, 4), 1f);
+        input.setPadding(Ui.dp(this, 16), Ui.dp(this, 14), Ui.dp(this, 16), Ui.dp(this, 14));
+        input.setText(settings.text());
+        input.setSelection(input.getText().length());
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+                updateCounter(s.length());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+        card.addView(input, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        Ui.margins(card, 0, 0, 0, Ui.dp(this, 12));
+        return card;
+    }
+
+    private View footer() {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.HORIZONTAL);
+        info.setGravity(Gravity.CENTER_VERTICAL);
+
+        counter = new TextView(this);
+        counter.setTextSize(12);
+        counter.setTextColor(MUTED);
+        info.addView(counter, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView cursorPlay = new TextView(this);
+        cursorPlay.setText("从光标处播放");
+        cursorPlay.setTextSize(13);
+        cursorPlay.setTextColor(ACCENT);
+        cursorPlay.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6));
+        cursorPlay.setBackground(Ui.ripple(0x00000000, Ui.dp(this, 8), 0x222F6FED));
+        cursorPlay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int pos = input.getSelectionStart();
+                if (pos <= 0) {
+                    Toast.makeText(MainActivity.this, "先把光标放到要开始的那一段", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startPlayback(true);
+            }
+        });
+        info.addView(cursorPlay);
+
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ilp.bottomMargin = Ui.dp(this, 8);
+        col.addView(info, ilp);
+
+        TextView start = new TextView(this);
+        start.setText("开始播放");
+        start.setTextSize(17);
+        start.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        start.setTextColor(Color.WHITE);
+        start.setGravity(Gravity.CENTER);
+        start.setBackground(Ui.ripple(ACCENT, Ui.dp(this, 16), 0x55FFFFFF));
+        start.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startPlayback(false);
+            }
+        });
+        col.addView(start, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 54)));
+
+        updateCounter(input.getText().length());
+        return col;
+    }
+
+    private void updateCounter(int len) {
+        if (counter == null) {
+            return;
+        }
+        counter.setText("共 " + len + " 字 · 每行约 " + settings.charsPerLine() + " 字");
+    }
+
+    private void startPlayback(boolean fromCursor) {
+        String text = input.getText().toString();
+        if (text.trim().length() == 0) {
+            Toast.makeText(this, "先输入要念的内容", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        settings.text(text);
+        InputMethodManager ime = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (ime != null) {
+            ime.hideSoftInputFromWindow(input.getWindowToken(), 0);
+        }
+        int start = 0;
+        if (fromCursor) {
+            start = Math.max(0, Math.min(input.getSelectionStart(), text.length()));
+        }
+        Intent i = new Intent(this, PromptActivity.class);
+        i.putExtra("start", start);
+        startActivity(i);
+        overridePendingTransition(0, 0);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        settings.text(input.getText().toString());
+    }
+
+    // ---------------------------------------------------------------- 设置
+
+    private Dialog dialog;
+    private TextView preview;
+    private SeekBar sizeBar;
+    private TextView sizeLabel;
+    private SeekBar speedBar;
+    private TextView speedLabel;
+    private final List<TextView> modeChips = new ArrayList<>();
+    private final List<TextView> orientChips = new ArrayList<>();
+    private final List<TextView> fontChips = new ArrayList<>();
+    private final List<View> bgDots = new ArrayList<>();
+
+    private void showSettings() {
+        dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(CARD);
+        int r = Ui.dp(this, 22);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        sheet.setBackground(bg);
+        sheet.setPadding(Ui.dp(this, 20), Ui.dp(this, 10), Ui.dp(this, 20), Ui.dp(this, 18));
+
+        View handle = new View(this);
+        handle.setBackground(Ui.round(0xFFD8DCE3, Ui.dp(this, 2)));
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(Ui.dp(this, 38), Ui.dp(this, 4));
+        hlp.gravity = Gravity.CENTER_HORIZONTAL;
+        hlp.bottomMargin = Ui.dp(this, 12);
+        sheet.addView(handle, hlp);
+
+        LinearLayout headRow = new LinearLayout(this);
+        headRow.setOrientation(LinearLayout.HORIZONTAL);
+        headRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView head = new TextView(this);
+        head.setText("设置");
+        head.setTextSize(20);
+        head.setTextColor(INK);
+        head.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        headRow.addView(head, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView done = new TextView(this);
+        done.setText("完成");
+        done.setTextSize(14);
+        done.setTextColor(Color.WHITE);
+        done.setGravity(Gravity.CENTER);
+        done.setPadding(Ui.dp(this, 18), Ui.dp(this, 8), Ui.dp(this, 18), Ui.dp(this, 8));
+        done.setBackground(Ui.ripple(ACCENT, Ui.dp(this, 18), 0x55FFFFFF));
+        done.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        headRow.addView(done);
+        sheet.addView(headRow);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(0, Ui.dp(this, 6), 0, 0);
+
+        // 滚动方式
+        body.addView(sectionLabel("滚动方式"));
+        modeChips.clear();
+        String[] modeNames = {"整屏上滚", "单行横移"};
+        for (int idx = 0; idx < modeNames.length; idx++) {
+            final int value = idx;
+            TextView c = chip(modeNames[idx], settings.mode() == idx);
+            c.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    settings.mode(value);
+                    refreshChips(modeChips, value, 2);
+                }
+            });
+            modeChips.add(c);
+        }
+        body.addView(chipRow(modeChips));
+
+        // 方向
+        body.addView(sectionLabel("播放方向"));
+        orientChips.clear();
+        for (int idx = 0; idx < 2; idx++) {
+            final int value = idx;
+            TextView c = chip(idx == 0 ? "竖屏" : "横屏", settings.orientation() == idx);
+            final TextView self = c;
+            c.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    settings.orientation(value);
+                    refreshChips(orientChips, value, 2);
+                    refreshPreview();
+                }
+            });
+            orientChips.add(c);
+        }
+        body.addView(chipRow(orientChips));
+
+        // 字号
+        sizeLabel = sectionLabel("");
+        body.addView(sizeLabel);
+        sizeBar = new SeekBar(this);
+        sizeBar.setMax(Settings.SIZE_MAX - Settings.SIZE_MIN);
+        sizeBar.setProgress(settings.size() - Settings.SIZE_MIN);
+        tintBar(sizeBar, ACCENT);
+        sizeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                settings.size(progress + Settings.SIZE_MIN);
+                refreshSizeLabel();
+                refreshPreview();
+                updateCounter(input.getText().length());
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar sb) {
+            }
+        });
+        body.addView(sizeBar);
+        refreshSizeLabel();
+
+        // 速度
+        speedLabel = sectionLabel("");
+        body.addView(speedLabel);
+        speedBar = new SeekBar(this);
+        speedBar.setMax(9);
+        speedBar.setProgress(settings.speed() - 1);
+        tintBar(speedBar, ACCENT);
+        speedBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                settings.speed(progress + 1);
+                refreshSpeedLabel();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar sb) {
+            }
+        });
+        body.addView(speedBar);
+        refreshSpeedLabel();
+
+        // 字体
+        body.addView(sectionLabel("字体"));
+        fontChips.clear();
+        String[] fontNames = {"系统", "黑体", "宋体", "等宽"};
+        for (int idx = 0; idx < fontNames.length; idx++) {
+            final int value = idx;
+            TextView c = chip(fontNames[idx], settings.font() == idx);
+            c.setTypeface(Settings.typeface(idx, false));
+            c.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    settings.font(value);
+                    refreshChips(fontChips, value, 4);
+                    refreshPreview();
+                }
+            });
+            fontChips.add(c);
+        }
+        body.addView(chipRow(fontChips));
+
+        // 加粗
+        body.addView(switchRow("加粗", settings.bold(), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                settings.bold(checked);
+                refreshPreview();
+            }
+        }));
+
+        // 背景色
+        body.addView(sectionLabel("背景颜色"));
+        LinearLayout dots = new LinearLayout(this);
+        dots.setOrientation(LinearLayout.HORIZONTAL);
+        bgDots.clear();
+        for (int i = 0; i < Settings.BG.length; i++) {
+            final int color = Settings.BG[i];
+            final View dot = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(this, 38), Ui.dp(this, 38));
+            lp.rightMargin = Ui.dp(this, 10);
+            dot.setTag(Integer.valueOf(color));
+            dot.setBackground(dotDrawable(color, color == settings.background()));
+            dot.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    settings.background(color);
+                    for (View d : bgDots) {
+                        int c = ((Integer) d.getTag()).intValue();
+                        d.setBackground(dotDrawable(c, c == color));
+                    }
+                    refreshPreview();
+                }
+            });
+            bgDots.add(dot);
+            dots.addView(dot, lp);
+        }
+        HorizontalScrollView hsv = new HorizontalScrollView(this);
+        hsv.setHorizontalScrollBarEnabled(false);
+        hsv.addView(dots);
+        body.addView(hsv);
+
+        // 镜像
+        body.addView(switchRow("镜像翻转（对着提词镜时用）", settings.mirror(),
+                new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        settings.mirror(checked);
+                    }
+                }));
+
+        // 预览
+        body.addView(sectionLabel("预览"));
+        preview = new TextView(this);
+        preview.setGravity(Gravity.CENTER);
+        preview.setPadding(Ui.dp(this, 10), Ui.dp(this, 18), Ui.dp(this, 10), Ui.dp(this, 18));
+        body.addView(preview, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        refreshPreview();
+
+        scroll.addView(body);
+        sheet.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        dialog.setContentView(sheet);
+
+        Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(0x00000000));
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attrs = w.getAttributes();
+            attrs.dimAmount = 0.45f;
+            w.setAttributes(attrs);
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            w.setGravity(Gravity.BOTTOM);
+        }
+        dialog.show();
+        Window w2 = dialog.getWindow();
+        if (w2 != null) {
+            w2.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private void refreshSizeLabel() {
+        sizeLabel.setText("字号 " + settings.size() + "% · 一行约 " + settings.charsPerLine() + " 字");
+    }
+
+    private void refreshSpeedLabel() {
+        speedLabel.setText("滚动速度 " + settings.speed() + " 字/秒");
+    }
+
+    private void refreshPreview() {
+        if (preview == null) {
+            return;
+        }
+        int bg = settings.background();
+        preview.setBackground(Ui.roundStroke(bg, 0x33000000, Ui.dp(this, 1), Ui.dp(this, 12)));
+        preview.setTextColor(Ui.contrastText(bg));
+        preview.setTypeface(Settings.typeface(settings.font(), settings.bold()));
+        preview.setTextSize(10 + settings.size() * 0.14f);
+        preview.setText("提词 预览");
+    }
+
+    private void refreshChips(List<TextView> chips, int selected, int count) {
+        for (int i = 0; i < chips.size() && i < count; i++) {
+            styleChip(chips.get(i), i == selected);
+        }
+    }
+
+    private TextView sectionLabel(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(13);
+        t.setTextColor(MUTED);
+        t.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 6));
+        return t;
+    }
+
+    private LinearLayout chipRow(List<TextView> chips) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < chips.size(); i++) {
+            TextView c = chips.get(i);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 38));
+            if (i > 0) {
+                lp.leftMargin = Ui.dp(this, 8);
+            }
+            row.addView(c, lp);
+        }
+        return row;
+    }
+
+    private TextView chip(String text, boolean selected) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+        styleChip(t, selected);
+        return t;
+    }
+
+    private void styleChip(TextView t, boolean selected) {
+        if (selected) {
+            t.setTextColor(Color.WHITE);
+            t.setBackground(Ui.ripple(ACCENT, Ui.dp(this, 19), 0x55FFFFFF));
+        } else {
+            t.setTextColor(0xFF4A5160);
+            t.setBackground(Ui.ripple(0xFFFFFFFF, Ui.dp(this, 19), 0x22000000));
+            GradientDrawable d = Ui.roundStroke(0xFFFFFFFF, 0xFFDDE1E7, Ui.dp(this, 1), Ui.dp(this, 19));
+            t.setBackground(new android.graphics.drawable.RippleDrawable(
+                    ColorStateList.valueOf(0x22000000), d, null));
+        }
+    }
+
+    private Drawable dotDrawable(int color, boolean selected) {
+        if (selected) {
+            return Ui.circleStroke(color, ACCENT, Ui.dp(this, 3));
+        }
+        return Ui.circleStroke(color, 0x66000000, Ui.dp(this, 1));
+    }
+
+    private View switchRow(String label, boolean value, CompoundButton.OnCheckedChangeListener l) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, Ui.dp(this, 12), 0, 0);
+
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(14);
+        t.setTextColor(INK);
+        row.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch sw = new Switch(this);
+        sw.setChecked(value);
+        sw.setThumbTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        sw.setTrackTintList(ColorStateList.valueOf(value ? ACCENT : TRACK));
+        final Switch self = sw;
+        sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                self.setTrackTintList(ColorStateList.valueOf(checked ? ACCENT : TRACK));
+                l.onCheckedChanged(b, checked);
+            }
+        });
+        row.addView(sw);
+        return row;
+    }
+
+    private void tintBar(SeekBar bar, int color) {
+        bar.setProgressTintList(ColorStateList.valueOf(color));
+        bar.setThumbTintList(ColorStateList.valueOf(color));
+        bar.setProgressBackgroundTintList(ColorStateList.valueOf(TRACK));
+    }
+}

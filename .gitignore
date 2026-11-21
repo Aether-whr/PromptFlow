@@ -1,0 +1,6 @@
+build/
+*.apk
+*.keystore
+*.class
+.DS_Store
+tp-crash*.txt
