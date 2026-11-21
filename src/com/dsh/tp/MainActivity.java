@@ -1002,7 +1002,7 @@ public class MainActivity extends android.app.Activity {
                 }));
 
         // 状态栏胶囊
-        body.addView(switchRow("状态栏胶囊（实验，显示当前行）", settings.chipNotify(),
+        body.addView(switchRow("通知开关（播放时显示当前行和进度）", settings.chipNotify(),
                 new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {

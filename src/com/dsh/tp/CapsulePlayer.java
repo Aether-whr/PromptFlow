@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -11,6 +13,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -28,8 +31,17 @@ final class CapsulePlayer implements PromptView.Listener {
     private final PromptView prompt;
     private final WindowManager.LayoutParams params;
     private final GestureDetector gestures;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean dragging;
+    private boolean longPressed;
+    private long lastTap;
+    private final Runnable singleTapTask = new Runnable() {
+        @Override
+        public void run() {
+            togglePause();
+        }
+    };
     private float downX;
     private float downY;
     private int startX;
@@ -81,13 +93,8 @@ final class CapsulePlayer implements PromptView.Listener {
             }
 
             @Override
-            public boolean onSingleTapConfirmed(MotionEvent e) {
-                togglePause();
-                return true;
-            }
-
-            @Override
             public void onLongPress(MotionEvent e) {
+                longPressed = true;
                 Toast.makeText(ctx, "胶囊已关闭", Toast.LENGTH_SHORT).show();
                 detach();
             }
@@ -104,6 +111,7 @@ final class CapsulePlayer implements PromptView.Listener {
                         startX = params.x;
                         startY = params.y;
                         dragging = false;
+                        longPressed = false;
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         float dx = e.getRawX() - downX;
@@ -120,11 +128,44 @@ final class CapsulePlayer implements PromptView.Listener {
                             }
                         }
                         return true;
+                    case MotionEvent.ACTION_UP:
+                        if (!dragging && !longPressed) {
+                            onTap();
+                        }
+                        return true;
                     default:
                         return true;
                 }
             }
         });
+    }
+
+    /** 单击暂停；双击放大成悬浮窗。 */
+    private void onTap() {
+        long now = System.currentTimeMillis();
+        if (now - lastTap < 300L) {
+            lastTap = 0L;
+            handler.removeCallbacks(singleTapTask);
+            expandToOverlay();
+        } else {
+            lastTap = now;
+            handler.postDelayed(singleTapTask, 280L);
+        }
+    }
+
+    private void expandToOverlay() {
+        prompt.pause();
+        root.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        root.animate().alpha(0f).scaleX(1.08f).scaleY(1.08f)
+                .setDuration(130L)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        detach();
+                        OverlayPlayer.show(ctx, 0);
+                    }
+                }).start();
     }
 
     static void show(Context c, int startChar) {
@@ -135,6 +176,14 @@ final class CapsulePlayer implements PromptView.Listener {
         try {
             current = new CapsulePlayer(c, startChar);
             current.wm.addView(current.root, current.params);
+            current.root.setAlpha(0f);
+            current.root.setScaleX(0.86f);
+            current.root.setScaleY(0.86f);
+            current.root.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            current.root.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(200L)
+                    .setInterpolator(new AccelerateInterpolator())
+                    .start();
             current.prompt.play();
             Toast.makeText(c, "点一下暂停，长按关闭", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -152,6 +201,7 @@ final class CapsulePlayer implements PromptView.Listener {
     }
 
     private void detach() {
+        handler.removeCallbacks(singleTapTask);
         try {
             prompt.pause();
         } catch (Exception ignored) {

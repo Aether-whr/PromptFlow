@@ -15,6 +15,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -383,6 +384,14 @@ final class OverlayPlayer implements PromptView.Listener {
         if (settings.chipNotify()) {
             ChipService.start(ctx);
         }
+        root.setAlpha(0f);
+        root.setScaleX(0.9f);
+        root.setScaleY(0.9f);
+        root.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        root.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(220L)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
         prompt.play();
     }
 
