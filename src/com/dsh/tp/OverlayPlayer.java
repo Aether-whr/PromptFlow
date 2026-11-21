@@ -6,6 +6,7 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -48,6 +49,13 @@ final class OverlayPlayer implements PromptView.Listener {
 
     private boolean dragging;
     private boolean scaled;
+    private long lastTap;
+    private final Runnable singleTapTask = new Runnable() {
+        @Override
+        public void run() {
+            onTap();
+        }
+    };
     private boolean seeking;
     private float downX;
     private float downY;
@@ -167,7 +175,7 @@ final class OverlayPlayer implements PromptView.Listener {
 
         speedBar = new SeekBar(ctx);
         speedBar.setMax(9);
-        speedBar.setProgress(settings.speed() - 1);
+        speedBar.setProgress(settings.overlaySpeed() - 1);
         speedBar.setProgressTintList(ColorStateList.valueOf(0xFFFFFFFF));
         speedBar.setProgressBackgroundTintList(ColorStateList.valueOf(0x40FFFFFF));
         speedBar.setThumbTintList(ColorStateList.valueOf(0xFFFFFFFF));
@@ -205,7 +213,7 @@ final class OverlayPlayer implements PromptView.Listener {
                     return;
                 }
                 int v = progress + 1;
-                settings.speed(v);
+                settings.overlaySpeed(v);
                 prompt.setCps(v);
                 scheduleHide();
             }
@@ -330,7 +338,15 @@ final class OverlayPlayer implements PromptView.Listener {
                         return true;
                     case MotionEvent.ACTION_UP:
                         if (!dragging && !scaled) {
-                            onTap();
+                            long now = SystemClock.uptimeMillis();
+                            if (now - lastTap < 320L) {
+                                lastTap = 0L;
+                                handler.removeCallbacks(singleTapTask);
+                                togglePlay();
+                            } else {
+                                lastTap = now;
+                                handler.postDelayed(singleTapTask, 260);
+                            }
                         }
                         return true;
                     default:
@@ -405,6 +421,7 @@ final class OverlayPlayer implements PromptView.Listener {
 
     private void detach() {
         handler.removeCallbacks(hideTask);
+        handler.removeCallbacks(singleTapTask);
         try {
             prompt.pause();
         } catch (Exception ignored) {

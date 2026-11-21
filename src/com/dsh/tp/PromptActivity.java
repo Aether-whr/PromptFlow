@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -89,10 +90,29 @@ public class PromptActivity extends Activity implements PromptView.Listener {
                 settings.size(), settings.speed(), settings.mirror(), settings.mode());
         view.setListener(this);
         view.setStartChar(getIntent().getIntExtra("start", 0));
-        view.setOnClickListener(new View.OnClickListener() {
+        final android.view.GestureDetector gestures = new android.view.GestureDetector(this,
+                new android.view.GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDown(MotionEvent e) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onSingleTapConfirmed(MotionEvent e) {
+                        onScreenTap();
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        togglePlay();
+                        return true;
+                    }
+                });
+        view.setOnTouchListener(new View.OnTouchListener() {
             @Override
-            public void onClick(View v) {
-                onScreenTap();
+            public boolean onTouch(View v, MotionEvent event) {
+                return gestures.onTouchEvent(event);
             }
         });
         root.addView(view, new FrameLayout.LayoutParams(

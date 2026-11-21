@@ -58,6 +58,15 @@ final class Settings {
         sp.edit().putInt("speed", clamp(v, 1, 10)).apply();
     }
 
+    /** 悬浮窗单独的速度，默认和全屏一样。 */
+    int overlaySpeed() {
+        return sp.getInt("overlaySpeed", speed());
+    }
+
+    void overlaySpeed(int v) {
+        sp.edit().putInt("overlaySpeed", clamp(v, 1, 10)).apply();
+    }
+
     int playMode() {
         return sp.getInt("playMode", PLAY_FULLSCREEN);
     }

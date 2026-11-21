@@ -883,6 +883,33 @@ public class MainActivity extends android.app.Activity {
         body.addView(speedBar);
         refreshSpeedLabel();
 
+        // 悬浮窗单独的速度
+        final TextView overlaySpeedLabel = sectionLabel("悬浮窗速度 " + settings.overlaySpeed() + " 字/秒");
+        body.addView(overlaySpeedLabel);
+        SeekBar overlaySpeedBar = new SeekBar(this);
+        overlaySpeedBar.setMax(9);
+        overlaySpeedBar.setProgress(settings.overlaySpeed() - 1);
+        tintBar(overlaySpeedBar, ACCENT);
+        overlaySpeedBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) {
+                    return;
+                }
+                settings.overlaySpeed(progress + 1);
+                overlaySpeedLabel.setText("悬浮窗速度 " + (progress + 1) + " 字/秒");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar sb) {
+            }
+        });
+        body.addView(overlaySpeedBar);
+
         // 字体
         body.addView(sectionLabel("字体"));
         fontChips.clear();
