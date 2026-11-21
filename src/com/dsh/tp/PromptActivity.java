@@ -564,6 +564,9 @@ public class PromptActivity extends Activity implements PromptView.Listener {
             return;
         }
         applyImmersive();
+        if (settings.chipNotify()) {
+            ChipService.start(this);
+        }
         if (voiceOn) {
             if (!openMic()) {
                 voiceOn = false;
@@ -592,7 +595,7 @@ public class PromptActivity extends Activity implements PromptView.Listener {
 
     @Override
     protected void onDestroy() {
-        NotificationHelper.cancel(this);
+        ChipService.stop(this);
         voiceOn = false;
         stopVoice();
         handler.removeCallbacks(hideRunnable);

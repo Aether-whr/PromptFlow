@@ -380,6 +380,9 @@ final class OverlayPlayer implements PromptView.Listener {
 
     private void attach() {
         wm.addView(root, params);
+        if (settings.chipNotify()) {
+            ChipService.start(ctx);
+        }
         prompt.play();
     }
 
@@ -420,7 +423,7 @@ final class OverlayPlayer implements PromptView.Listener {
     }
 
     private void detach() {
-        NotificationHelper.cancel(ctx);
+        ChipService.stop(ctx);
         handler.removeCallbacks(hideTask);
         handler.removeCallbacks(singleTapTask);
         try {

@@ -16,7 +16,7 @@ import android.os.SystemClock;
 final class NotificationHelper {
 
     private static final String CHANNEL = "live_chip";
-    private static final int ID = 0x7A11;
+    static final int ID = 0x7A11;
     private static long lastUpdate;
 
     private NotificationHelper() {
@@ -31,8 +31,10 @@ final class NotificationHelper {
             return;
         }
         NotificationChannel ch = new NotificationChannel(CHANNEL, "提词进度",
-                NotificationManager.IMPORTANCE_LOW);
+                NotificationManager.IMPORTANCE_DEFAULT);
         ch.setShowBadge(false);
+        ch.enableVibration(false);
+        ch.setSound(null, null);
         ch.setDescription("播放时在通知栏显示当前行");
         nm.createNotificationChannel(ch);
     }
@@ -43,6 +45,17 @@ final class NotificationHelper {
             return;
         }
         lastUpdate = now;
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm != null) {
+            try {
+                nm.notify(ID, build(c, lineText, line, total, fraction));
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /** 组装通知；给前台服务和普通更新共用。 */
+    static Notification build(Context c, String lineText, int line, int total, float fraction) {
         ensureChannel(c);
 
         Intent open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
@@ -69,17 +82,16 @@ final class NotificationHelper {
         if (pi != null) {
             b.setContentIntent(pi);
         }
-        if (Build.VERSION.SDK_INT >= 36) {
-            liveStyle(b, lineText);
-        }
-
-        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) {
+        if (Build.VERSION.SDK_INT >= 31) {
             try {
-                nm.notify(ID, b.build());
+                b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
             } catch (Throwable ignored) {
             }
         }
+        if (Build.VERSION.SDK_INT >= 36) {
+            liveStyle(b, lineText);
+        }
+        return b.build();
     }
 
     /** 反射调用 API 36 才有的 ProgressStyle / promoted ongoing，失败就退回普通通知。 */
