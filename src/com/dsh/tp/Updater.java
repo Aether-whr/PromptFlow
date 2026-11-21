@@ -22,8 +22,9 @@ import java.net.URL;
 /** 从 GitHub Release 拉最新版本、下载 APK 并交给系统安装器。 */
 final class Updater {
 
+    /** 用仓库 id 而不是 owner/name：账号或仓库改名后地址依然有效。 */
     static final String LATEST_RELEASE =
-            "https://api.github.com/repos/Iwanteatpaimeng/PromptFlow/releases/latest";
+            "https://api.github.com/repositories/1466636341/releases/latest";
 
     private Updater() {
     }
