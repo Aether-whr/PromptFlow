@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -15,7 +17,7 @@ import android.view.View;
  */
 class CapsuleView extends View {
 
-    private static final int BG = 0xF2000000;
+    private static final int BG = 0xFF000000;
     private static final int BORDER = 0x33FFFFFF;
     private static final int FADE_W_DP = 26;
 
@@ -143,24 +145,30 @@ class CapsuleView extends View {
         clipPath.reset();
         clipPath.addRoundRect(rect, radius, radius, Path.Direction.CW);
 
+        // 文字只画到进度环左侧，绝不压到环
+        float textRight = w - ringSize - ringMargin * 2f;
+
         int save = canvas.save();
         canvas.clipPath(clipPath);
-
         canvas.drawRect(rect, bgPaint);
 
+        // 文字单独放一层，用 DST_OUT 把两侧擦成渐变，不会在背景上叠出深色块
+        int layer = canvas.saveLayer(0, 0, w, h, null);
+        canvas.clipRect(0, 0, textRight, h);
         float baseline = h / 2f - (fm.ascent + fm.descent) / 2f;
         canvas.drawText(text, padLeft - offset, baseline, textPaint);
-
-        // 左边缘渐隐
+        fadePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
         fadePaint.setShader(new LinearGradient(0, 0, fadeWidth, 0,
-                BG, 0x00F20000, Shader.TileMode.CLAMP));
+                0xFF000000, 0x00000000, Shader.TileMode.CLAMP));
         canvas.drawRect(0, 0, fadeWidth, h, fadePaint);
-        // 右边缘渐隐（进度环之前）
-        float right = w - ringSize - ringMargin * 2;
-        fadePaint.setShader(new LinearGradient(right - fadeWidth, 0, right, 0,
-                0x00F20000, BG, Shader.TileMode.CLAMP));
-        canvas.drawRect(Math.max(0, right - fadeWidth), 0, Math.max(0, right), h, fadePaint);
+        if (textRight > fadeWidth) {
+            fadePaint.setShader(new LinearGradient(textRight - fadeWidth, 0, textRight, 0,
+                    0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
+            canvas.drawRect(textRight - fadeWidth, 0, textRight, h, fadePaint);
+        }
         fadePaint.setShader(null);
+        fadePaint.setXfermode(null);
+        canvas.restoreToCount(layer);
 
         // 进度环
         float cx = w - ringMargin - ringSize / 2f;
