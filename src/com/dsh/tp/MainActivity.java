@@ -1,5 +1,6 @@
 package com.dsh.tp;
 
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.ColorStateList;
@@ -78,6 +79,24 @@ public class MainActivity extends android.app.Activity {
         title.setTextColor(INK);
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView clear = new TextView(this);
+        clear.setText("清空");
+        clear.setTextSize(14);
+        clear.setTextColor(0xFF8A6A22);
+        clear.setGravity(Gravity.CENTER);
+        clear.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        clear.setBackground(Ui.ripple(0xFFFDF3DC, Ui.dp(this, 20), 0x33A57500));
+        clear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmClear();
+            }
+        });
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.rightMargin = Ui.dp(this, 8);
+        row.addView(clear, clp);
 
         TextView gear = new TextView(this);
         gear.setText("设置");
@@ -195,6 +214,26 @@ public class MainActivity extends android.app.Activity {
             return;
         }
         counter.setText("共 " + len + " 字 · 每行约 " + settings.charsPerLine() + " 字");
+    }
+
+    /** 清空编辑框里的内容，先确认一下免得误触。 */
+    private void confirmClear() {
+        if (input.getText().length() == 0) {
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("清空输入的内容？")
+                .setMessage("正文会被清空，字号、速度这些设置不受影响。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("清空", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        input.setText("");
+                        settings.text("");
+                        input.requestFocus();
+                    }
+                })
+                .show();
     }
 
     private void startPlayback(boolean fromCursor) {
