@@ -13,6 +13,7 @@ import android.util.DisplayMetrics;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
@@ -35,6 +36,14 @@ final class CapsulePlayer implements PromptView.Listener {
     private RingView ring;
     private final WindowManager.LayoutParams params;
     private final GestureDetector gestures;
+    private final ScaleGestureDetector scaleDetector;
+    private int winW;
+    private int winH;
+    private final int minW;
+    private final int minH;
+    private final int maxW;
+    private final int maxH;
+    private boolean scaled;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private boolean dragging;
@@ -60,6 +69,12 @@ final class CapsulePlayer implements PromptView.Listener {
 
         int w = Math.min((int) (dm.widthPixels * 0.66f), Ui.dp(ctx, 300));
         int h = Ui.dp(ctx, 48);
+        winW = w;
+        winH = h;
+        minW = Ui.dp(ctx, 180);
+        minH = Ui.dp(ctx, 40);
+        maxW = dm.widthPixels;
+        maxH = (int) (dm.heightPixels * 0.4f);
 
         root = new FrameLayout(ctx);
         GradientDrawable back = new GradientDrawable();
@@ -68,6 +83,8 @@ final class CapsulePlayer implements PromptView.Listener {
         back.setStroke(Ui.dp(ctx, 1), 0x33FFFFFF);
         root.setBackground(back);
         root.setPadding(Ui.dp(ctx, 4), 0, Ui.dp(ctx, 4), 0);
+        // 关键：把子 View 裁进圆角里，否则渐隐方块会从圆角处露出直角
+        root.setClipToOutline(true);
 
         // 胶囊里固定用单行横移，字号由高度决定
         prompt = new PromptView(ctx, settings.text(), 0xFFFFFFFF, settings.font(),
@@ -95,7 +112,7 @@ final class CapsulePlayer implements PromptView.Listener {
         leftFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{0xF2000000, 0x00F20000}));
         FrameLayout.LayoutParams lf = new FrameLayout.LayoutParams(
-                Ui.dp(ctx, 16), FrameLayout.LayoutParams.MATCH_PARENT);
+                Ui.dp(ctx, 26), FrameLayout.LayoutParams.MATCH_PARENT);
         lf.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
         root.addView(leftFade, lf);
 
@@ -103,7 +120,7 @@ final class CapsulePlayer implements PromptView.Listener {
         rightFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
                 new int[]{0xF2000000, 0x00F20000}));
         FrameLayout.LayoutParams rf = new FrameLayout.LayoutParams(
-                Ui.dp(ctx, 16), FrameLayout.LayoutParams.MATCH_PARENT);
+                Ui.dp(ctx, 26), FrameLayout.LayoutParams.MATCH_PARENT);
         rf.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
         rf.rightMargin = ringSize + gap;
         root.addView(rightFade, rf);
@@ -111,7 +128,7 @@ final class CapsulePlayer implements PromptView.Listener {
         int type = Build.VERSION.SDK_INT >= 26
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
-        params = new WindowManager.LayoutParams(w, h, type,
+        params = new WindowManager.LayoutParams(winW, winH, type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
@@ -120,6 +137,36 @@ final class CapsulePlayer implements PromptView.Listener {
         params.y = Ui.dp(ctx, 18);
 
         slop = ViewConfiguration.get(ctx).getScaledTouchSlop();
+        scaleDetector = new ScaleGestureDetector(ctx, new ScaleGestureDetector.OnScaleGestureListener() {
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                float f = detector.getScaleFactor();
+                int cx = params.x + winW / 2;
+                int cy = params.y + winH / 2;
+                winW = clamp(Math.round(winW * f), minW, maxW);
+                winH = clamp(Math.round(winH * f), minH, maxH);
+                params.width = winW;
+                params.height = winH;
+                params.x = cx - winW / 2;
+                params.y = cy - winH / 2;
+                try {
+                    wm.updateViewLayout(root, params);
+                } catch (Exception ignored) {
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onScaleBegin(ScaleGestureDetector detector) {
+                dragging = false;
+                scaled = true;
+                return true;
+            }
+
+            @Override
+            public void onScaleEnd(ScaleGestureDetector detector) {
+            }
+        });
         gestures = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDown(MotionEvent e) {
@@ -137,6 +184,10 @@ final class CapsulePlayer implements PromptView.Listener {
         root.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent e) {
+                scaleDetector.onTouchEvent(e);
+                if (scaleDetector.isInProgress()) {
+                    return true;
+                }
                 gestures.onTouchEvent(e);
                 switch (e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
@@ -146,6 +197,7 @@ final class CapsulePlayer implements PromptView.Listener {
                         startY = params.y;
                         dragging = false;
                         longPressed = false;
+                        scaled = false;
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         float dx = e.getRawX() - downX;
@@ -163,7 +215,7 @@ final class CapsulePlayer implements PromptView.Listener {
                         }
                         return true;
                     case MotionEvent.ACTION_UP:
-                        if (!dragging && !longPressed) {
+                        if (!dragging && !longPressed && !scaled) {
                             onTap();
                         }
                         return true;
@@ -200,6 +252,10 @@ final class CapsulePlayer implements PromptView.Listener {
                         OverlayPlayer.show(ctx, 0);
                     }
                 }).start();
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
     }
 
     static void show(Context c, int startChar) {
