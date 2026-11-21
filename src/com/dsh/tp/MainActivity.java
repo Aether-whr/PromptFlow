@@ -763,6 +763,7 @@ public class MainActivity extends android.app.Activity {
     private SeekBar speedBar;
     private TextView speedLabel;
     private final List<TextView> modeChips = new ArrayList<>();
+    private LinearLayout modeRow;
     private final List<TextView> playChips = new ArrayList<>();
     private final List<TextView> orientChips = new ArrayList<>();
     private TextView orientLabel;
@@ -845,7 +846,9 @@ public class MainActivity extends android.app.Activity {
             });
             modeChips.add(c);
         }
-        body.addView(chipRow(modeChips));
+        modeRow = chipRow(modeChips);
+        body.addView(modeRow);
+        applyCapsuleModeLock();
 
         // 播放方式
         body.addView(sectionLabel("播放方式"));
@@ -860,6 +863,7 @@ public class MainActivity extends android.app.Activity {
                     settings.playMode(value);
                     refreshChips(playChips, value, 3);
                     applyOrientationVisibility();
+                    applyCapsuleModeLock();
                 }
             });
             playChips.add(c);
@@ -1122,6 +1126,25 @@ public class MainActivity extends android.app.Activity {
         Window w2 = dialog.getWindow();
         if (w2 != null) {
             w2.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    /** 顶部胶囊天生单行，选中它时把「整屏上滚」藏掉并强制横移。 */
+    private void applyCapsuleModeLock() {
+        if (modeChips.size() < 2) {
+            return;
+        }
+        boolean capsule = settings.playMode() == Settings.PLAY_CAPSULE;
+        if (modeRow != null && modeRow.getParent() instanceof ViewGroup) {
+            TransitionManager.beginDelayedTransition((ViewGroup) modeRow.getParent(),
+                    new AutoTransition().setDuration(220));
+        }
+        if (capsule) {
+            settings.mode(Settings.MODE_HORIZONTAL);
+            refreshChips(modeChips, Settings.MODE_HORIZONTAL, 2);
+            modeChips.get(0).setVisibility(View.GONE);
+        } else {
+            modeChips.get(0).setVisibility(View.VISIBLE);
         }
     }
 
