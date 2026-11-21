@@ -3,6 +3,7 @@ package com.dsh.tp;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
@@ -76,7 +77,7 @@ final class CapsulePlayer implements PromptView.Listener {
         maxW = dm.widthPixels;
         maxH = (int) (dm.heightPixels * 0.4f);
 
-        root = new FrameLayout(ctx);
+        root = new RoundClip(ctx, h / 2f);
         GradientDrawable back = new GradientDrawable();
         back.setColor(0xF2000000);
         back.setCornerRadius(h / 2f);
@@ -318,6 +319,29 @@ final class CapsulePlayer implements PromptView.Listener {
         prompt.restart();
         if (ring != null) {
             ring.setTarget(0f);
+        }
+    }
+
+    /** 把子 View 画进圆角路径里，比 clipToOutline 更保险（部分机型对硬件层不生效）。 */
+    private static final class RoundClip extends FrameLayout {
+        private final Path path = new Path();
+        private final RectF rect = new RectF();
+        private final float radius;
+
+        RoundClip(Context c, float radius) {
+            super(c);
+            this.radius = radius;
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            rect.set(0, 0, getWidth(), getHeight());
+            path.reset();
+            path.addRoundRect(rect, radius, radius, Path.Direction.CW);
+            int save = canvas.save();
+            canvas.clipPath(path);
+            super.dispatchDraw(canvas);
+            canvas.restoreToCount(save);
         }
     }
 
