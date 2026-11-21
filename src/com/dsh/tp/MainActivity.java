@@ -684,7 +684,7 @@ public class MainActivity extends android.app.Activity {
         if (fromCursor) {
             start = Math.max(0, Math.min(input.getSelectionStart(), text.length()));
         }
-        if (settings.playMode() == Settings.PLAY_OVERLAY) {
+        if (settings.playMode() != Settings.PLAY_FULLSCREEN) {
             if (Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
                 final Sheet sheet = Sheet.create(this, "需要悬浮窗权限");
                 sheet.text("要在其他应用上面显示台词，得先允许「提词器」显示在其他应用的上层。设置好之后回来再点「开始播放」。");
@@ -705,7 +705,11 @@ public class MainActivity extends android.app.Activity {
                 sheet.show();
                 return;
             }
-            OverlayPlayer.show(this, start);
+            if (settings.playMode() == Settings.PLAY_CAPSULE) {
+                CapsulePlayer.show(this, start);
+            } else {
+                OverlayPlayer.show(this, start);
+            }
             moveTaskToBack(true);
             return;
         }
@@ -815,7 +819,7 @@ public class MainActivity extends android.app.Activity {
         // 播放方式
         body.addView(sectionLabel("播放方式"));
         playChips.clear();
-        String[] playNames = {"全屏", "悬浮窗"};
+        String[] playNames = {"全屏", "悬浮窗", "顶部胶囊"};
         for (int idx = 0; idx < playNames.length; idx++) {
             final int value = idx;
             TextView c = chip(playNames[idx], settings.playMode() == idx);
@@ -823,7 +827,7 @@ public class MainActivity extends android.app.Activity {
                 @Override
                 public void onClick(View v) {
                     settings.playMode(value);
-                    refreshChips(playChips, value, 2);
+                    refreshChips(playChips, value, 3);
                 }
             });
             playChips.add(c);

@@ -13,6 +13,7 @@ final class Settings {
     /** 播放方式：全屏播放 / 悬浮窗播放。 */
     static final int PLAY_FULLSCREEN = 0;
     static final int PLAY_OVERLAY = 1;
+    static final int PLAY_CAPSULE = 2;
 
     /** 滚动方式：整屏向上滚 / 所有文字连成一行横着滚。 */
     static final int MODE_VERTICAL = 0;
