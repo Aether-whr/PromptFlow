@@ -12,6 +12,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.animation.ValueAnimator;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.WindowInsets;
@@ -23,6 +24,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
+import android.transition.AutoTransition;
+import android.transition.TransitionManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.CompoundButton;
 import android.widget.EditText;
@@ -37,6 +41,8 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 /** 编辑页：写内容、改设置、开始播放。 */
@@ -760,6 +766,7 @@ public class MainActivity extends android.app.Activity {
     private final List<TextView> playChips = new ArrayList<>();
     private final List<TextView> orientChips = new ArrayList<>();
     private TextView orientLabel;
+    private final Map<TextView, ValueAnimator> chipAnims = new HashMap<>();
     private LinearLayout orientRow;
     private final List<TextView> fontChips = new ArrayList<>();
     private final List<View> bgDots = new ArrayList<>();
@@ -1120,6 +1127,13 @@ public class MainActivity extends android.app.Activity {
 
     private void applyOrientationVisibility() {
         int vis = settings.playMode() == Settings.PLAY_FULLSCREEN ? View.VISIBLE : View.GONE;
+        if (orientLabel != null && orientLabel.getVisibility() == vis) {
+            return;
+        }
+        if (orientRow != null && orientRow.getParent() instanceof ViewGroup) {
+            TransitionManager.beginDelayedTransition((ViewGroup) orientRow.getParent(),
+                    new AutoTransition().setDuration(240));
+        }
         if (orientLabel != null) {
             orientLabel.setVisibility(vis);
         }
@@ -1188,17 +1202,46 @@ public class MainActivity extends android.app.Activity {
         return t;
     }
 
-    private void styleChip(TextView t, boolean selected) {
-        if (selected) {
-            t.setTextColor(Color.WHITE);
-            t.setBackground(Ui.ripple(ACCENT, Ui.dp(this, 19), 0x55FFFFFF));
-        } else {
-            t.setTextColor(0xFF4A5160);
-            t.setBackground(Ui.ripple(0xFFFFFFFF, Ui.dp(this, 19), 0x22000000));
-            GradientDrawable d = Ui.roundStroke(0xFFFFFFFF, 0xFFDDE1E7, Ui.dp(this, 1), Ui.dp(this, 19));
-            t.setBackground(new android.graphics.drawable.RippleDrawable(
-                    ColorStateList.valueOf(0x22000000), d, null));
+    private void styleChip(final TextView t, boolean selected) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(Ui.dp(this, 19));
+        final GradientDrawable shp = shape;
+        android.graphics.drawable.RippleDrawable ripple = new android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(0x22000000), shp, null);
+        t.setBackground(ripple);
+
+        Object tag = t.getTag();
+        float from = tag instanceof Float ? (Float) tag : (selected ? 1f : 0f);
+        float to = selected ? 1f : 0f;
+        t.setTag(to);
+
+        ValueAnimator old = chipAnims.get(t);
+        if (old != null) {
+            old.cancel();
         }
+        final ValueAnimator anim = ValueAnimator.ofFloat(from, to).setDuration(200L);
+        anim.setInterpolator(new DecelerateInterpolator());
+        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                float f = (Float) a.getAnimatedValue();
+                shp.setColor(blend(0xFFFFFFFF, ACCENT, f));
+                shp.setStroke(Ui.dp(MainActivity.this, 1), blend(0xFFDDE1E7, 0x002F6FED, f));
+                t.setTextColor(blend(0xFF4A5160, 0xFFFFFFFF, f));
+            }
+        });
+        chipAnims.put(t, anim);
+        anim.start();
+    }
+
+    /** 线性混合两个颜色（含 alpha），用于 chip 的选中过渡。 */
+    private static int blend(int from, int to, float f) {
+        float t = Math.max(0f, Math.min(1f, f));
+        int a = Math.round(Color.alpha(from) + (Color.alpha(to) - Color.alpha(from)) * t);
+        int r = Math.round(Color.red(from) + (Color.red(to) - Color.red(from)) * t);
+        int g = Math.round(Color.green(from) + (Color.green(to) - Color.green(from)) * t);
+        int b = Math.round(Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t);
+        return Color.argb(a, r, g, b);
     }
 
     private Drawable dotDrawable(int color, boolean selected) {
