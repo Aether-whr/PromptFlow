@@ -1209,6 +1209,8 @@ public class MainActivity extends android.app.Activity {
             w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             w.setGravity(Gravity.BOTTOM);
         }
+        // 设置面板是独立 Dialog，不在主界面视图树里，需要单独挂振动/回弹
+        Ui.bounceAll(sheet);
         dialog.show();
         Window w2 = dialog.getWindow();
         if (w2 != null) {
