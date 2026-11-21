@@ -666,6 +666,32 @@ public class MainActivity extends android.app.Activity {
         if (fromCursor) {
             start = Math.max(0, Math.min(input.getSelectionStart(), text.length()));
         }
+        if (settings.playMode() == Settings.PLAY_OVERLAY) {
+            if (Build.VERSION.SDK_INT >= 23 && !android.provider.Settings.canDrawOverlays(this)) {
+                final Sheet sheet = Sheet.create(this, "需要悬浮窗权限");
+                sheet.text("要在其他应用上面显示台词，得先允许「提词器」显示在其他应用的上层。设置好之后回来再点「开始播放」。");
+                sheet.cancel("取消");
+                sheet.primary("去设置", new Runnable() {
+                    @Override
+                    public void run() {
+                        sheet.dismiss();
+                        try {
+                            startActivity(new Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:" + getPackageName())));
+                        } catch (Exception e) {
+                            alert("打不开设置", String.valueOf(e.getMessage()));
+                        }
+                    }
+                });
+                sheet.show();
+                return;
+            }
+            OverlayPlayer.show(this, start);
+            moveTaskToBack(true);
+            return;
+        }
+
         Intent i = new Intent(this, PromptActivity.class);
         i.putExtra("start", start);
         startActivity(i);
@@ -687,6 +713,7 @@ public class MainActivity extends android.app.Activity {
     private SeekBar speedBar;
     private TextView speedLabel;
     private final List<TextView> modeChips = new ArrayList<>();
+    private final List<TextView> playChips = new ArrayList<>();
     private final List<TextView> orientChips = new ArrayList<>();
     private final List<TextView> fontChips = new ArrayList<>();
     private final List<View> bgDots = new ArrayList<>();
@@ -737,7 +764,13 @@ public class MainActivity extends android.app.Activity {
         headRow.addView(done);
         sheet.addView(headRow);
 
-        ScrollView scroll = new ScrollView(this);
+        ScrollView scroll = new ScrollView(this) {
+            @Override
+            protected void onMeasure(int widthSpec, int heightSpec) {
+                int max = (int) (getResources().getDisplayMetrics().heightPixels * 0.82f);
+                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST));
+            }
+        };
         scroll.setVerticalScrollBarEnabled(false);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
@@ -760,6 +793,24 @@ public class MainActivity extends android.app.Activity {
             modeChips.add(c);
         }
         body.addView(chipRow(modeChips));
+
+        // 播放方式
+        body.addView(sectionLabel("播放方式"));
+        playChips.clear();
+        String[] playNames = {"全屏", "悬浮窗"};
+        for (int idx = 0; idx < playNames.length; idx++) {
+            final int value = idx;
+            TextView c = chip(playNames[idx], settings.playMode() == idx);
+            c.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    settings.playMode(value);
+                    refreshChips(playChips, value, 2);
+                }
+            });
+            playChips.add(c);
+        }
+        body.addView(chipRow(playChips));
 
         // 方向
         body.addView(sectionLabel("播放方向"));
