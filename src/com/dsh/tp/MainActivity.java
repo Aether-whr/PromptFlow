@@ -9,7 +9,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -29,6 +33,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,6 +84,24 @@ public class MainActivity extends android.app.Activity {
         title.setTextColor(INK);
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView update = new TextView(this);
+        update.setText("更新");
+        update.setTextSize(14);
+        update.setTextColor(ACCENT);
+        update.setGravity(Gravity.CENTER);
+        update.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        update.setBackground(Ui.ripple(0xFFE9F0FE, Ui.dp(this, 20), 0x332F6FED));
+        update.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkUpdate();
+            }
+        });
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ulp.rightMargin = Ui.dp(this, 8);
+        row.addView(update, ulp);
 
         TextView clear = new TextView(this);
         clear.setText("清空");
@@ -214,6 +237,178 @@ public class MainActivity extends android.app.Activity {
             return;
         }
         counter.setText("共 " + len + " 字 · 每行约 " + settings.charsPerLine() + " 字");
+    }
+
+    // ---------------------------------------------------------------- 更新
+
+    private void checkUpdate() {
+        final AlertDialog checking = new AlertDialog.Builder(this)
+                .setTitle("检查更新")
+                .setMessage("正在查询 GitHub 上的最新版本…")
+                .setCancelable(false)
+                .create();
+        checking.show();
+        final Handler handler = new Handler(Looper.getMainLooper());
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Updater.check(new Updater.CheckCallback() {
+                    @Override
+                    public void done(final String tag, final String notes, final String url,
+                                     final long size, final String error) {
+                        handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                checking.dismiss();
+                                if (error != null) {
+                                    alert("检查更新失败", error);
+                                    return;
+                                }
+                                String current = currentVersion();
+                                if (!isNewer(tag, current)) {
+                                    alert("已是最新版本", "当前 " + current + "，GitHub 上最新是 " + tag + "。");
+                                    return;
+                                }
+                                if (url == null) {
+                                    alert("没有安装包", "最新版本 " + tag + " 没有附带 APK 文件。");
+                                    return;
+                                }
+                                String body = notes == null ? "" : notes.trim();
+                                if (body.length() > 600) {
+                                    body = body.substring(0, 600) + "…";
+                                }
+                                new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("发现新版本 " + tag)
+                                        .setMessage(body.isEmpty() ? "是否下载并安装？" : body + "\n\n是否下载并安装？")
+                                        .setNegativeButton("以后再说", null)
+                                        .setPositiveButton("下载并安装", new android.content.DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(android.content.DialogInterface d, int w) {
+                                                startUpdate(url);
+                                            }
+                                        })
+                                        .show();
+                            }
+                        });
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void startUpdate(final String url) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("需要安装权限")
+                    .setMessage("系统会打开设置页，请允许「提词器」安装未知应用，然后回来再点一次「更新」。")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("去设置", new android.content.DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(android.content.DialogInterface d, int w) {
+                            try {
+                                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                        Uri.parse("package:" + getPackageName())));
+                            } catch (Exception e) {
+                                alert("打开设置失败", String.valueOf(e.getMessage()));
+                            }
+                        }
+                    })
+                    .show();
+            return;
+        }
+
+        final AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("正在下载更新")
+                .setMessage("0%")
+                .setCancelable(false)
+                .create();
+        progress.show();
+        final Handler handler = new Handler(Looper.getMainLooper());
+        final File dest = new File(getCacheDir(), "update.apk");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Updater.download(url, dest, new Updater.Progress() {
+                        @Override
+                        public void onProgress(final int percent) {
+                            handler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    progress.setMessage(percent + "%");
+                                }
+                            });
+                        }
+                    });
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            progress.dismiss();
+                            installApk(dest);
+                        }
+                    });
+                } catch (final Exception e) {
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            progress.dismiss();
+                            alert("下载失败", String.valueOf(e.getMessage()));
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void installApk(File apk) {
+        try {
+            Updater.install(this, apk);
+        } catch (Exception e) {
+            alert("安装失败", String.valueOf(e.getMessage()));
+        }
+    }
+
+    private String currentVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "0";
+        }
+    }
+
+    /** tag 比 current 新才返回 true；支持 "v1.5" 这种写法。 */
+    private static boolean isNewer(String tag, String current) {
+        int[] a = nums(tag);
+        int[] b = nums(current);
+        for (int i = 0; i < 3; i++) {
+            if (a[i] != b[i]) {
+                return a[i] > b[i];
+            }
+        }
+        return false;
+    }
+
+    private static int[] nums(String value) {
+        int[] out = new int[3];
+        if (value == null) {
+            return out;
+        }
+        String[] parts = value.replaceAll("[^0-9.]", "").split("\\.");
+        for (int i = 0; i < parts.length && i < 3; i++) {
+            try {
+                out[i] = Integer.parseInt(parts[i]);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return out;
+    }
+
+    private void alert(String title, String message) {
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("知道了", null)
+                .show();
     }
 
     /** 清空编辑框里的内容，先确认一下免得误触。 */
