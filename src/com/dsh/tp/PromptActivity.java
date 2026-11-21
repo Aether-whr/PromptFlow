@@ -2,6 +2,7 @@ package com.dsh.tp;
 
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -42,6 +43,11 @@ public class PromptActivity extends Activity implements PromptView.Listener {
     };
 
     private boolean seeking;
+
+    private VoiceFollower follower;
+    private boolean voiceOn;
+    private boolean gate = true;
+    private TextView voiceBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -173,6 +179,10 @@ public class PromptActivity extends Activity implements PromptView.Listener {
             @Override
             public void onClick(View v) {
                 view.restart();
+                if (voiceOn) {
+                    gate = true;
+                    view.pause();
+                }
                 updatePlayLabel();
                 scheduleHide();
             }
@@ -235,6 +245,18 @@ public class PromptActivity extends Activity implements PromptView.Listener {
         posBar.setProgressBackgroundTintList(ColorStateList.valueOf(0x26FFFFFF));
         posBar.setThumbTintList(ColorStateList.valueOf(0xFFFFFFFF));
         row2.addView(posBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 36), 1f));
+
+        voiceBtn = chip("跟读", 0xFFE6F4FF, 0x1FFFFFFF);
+        voiceBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleVoice();
+            }
+        });
+        LinearLayout.LayoutParams vbp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 36));
+        vbp.leftMargin = Ui.dp(this, 8);
+        row2.addView(voiceBtn, vbp);
 
         posLabel = new TextView(this);
         posLabel.setText(settings.mode() == Settings.MODE_HORIZONTAL ? "0%" : "第 1 / 1 行");
@@ -346,6 +368,13 @@ public class PromptActivity extends Activity implements PromptView.Listener {
     }
 
     private void togglePlay() {
+        if (voiceOn) {
+            gate = !gate;
+            view.pause();
+            updatePlayLabel();
+            scheduleHide();
+            return;
+        }
         if (view.isPlaying()) {
             view.pause();
         } else if (view.isFinished() || view.fraction() >= 0.999f) {
@@ -358,7 +387,107 @@ public class PromptActivity extends Activity implements PromptView.Listener {
     }
 
     private void updatePlayLabel() {
-        playBtn.setText(view.isPlaying() ? "暂停" : "继续");
+        if (voiceOn) {
+            playBtn.setText(gate ? "暂停" : "继续");
+        } else {
+            playBtn.setText(view.isPlaying() ? "暂停" : "继续");
+        }
+    }
+
+    // ------------------------------------------------------------- 跟读
+
+    private void toggleVoice() {
+        if (voiceOn) {
+            voiceOn = false;
+            stopVoice();
+            updateVoiceBtn();
+            view.pause();
+            updatePlayLabel();
+            scheduleHide();
+            return;
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 41);
+            return;
+        }
+        startVoice();
+    }
+
+    private void startVoice() {
+        if (!openMic()) {
+            Toast.makeText(this, "麦克风打不开，可能被别的应用占用了", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        voiceOn = true;
+        gate = true;
+        view.pause();
+        updateVoiceBtn();
+        updatePlayLabel();
+        scheduleHide();
+        Toast.makeText(this, "跟读已开启：开口就滚，停下就停", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean openMic() {
+        if (follower != null) {
+            return true;
+        }
+        VoiceFollower f = new VoiceFollower(new VoiceFollower.Listener() {
+            @Override
+            public void onSpeaking(boolean speaking) {
+                onVoiceState(speaking);
+            }
+        });
+        if (!f.start()) {
+            return false;
+        }
+        follower = f;
+        return true;
+    }
+
+    private void stopVoice() {
+        if (follower != null) {
+            follower.stop();
+            follower = null;
+        }
+    }
+
+    private void onVoiceState(boolean speaking) {
+        if (!voiceOn || !gate || view.isFinished()) {
+            return;
+        }
+        if (speaking) {
+            view.play();
+        } else {
+            view.pause();
+        }
+    }
+
+    private void updateVoiceBtn() {
+        if (voiceBtn == null) {
+            return;
+        }
+        if (voiceOn) {
+            voiceBtn.setText("跟读中");
+            voiceBtn.setTextColor(0xFF12321F);
+            voiceBtn.setBackground(Ui.ripple(0xFF7BE3B4, Ui.dp(this, 10), 0x33FFFFFF));
+        } else {
+            voiceBtn.setText("跟读");
+            voiceBtn.setTextColor(0xFFE6F4FF);
+            voiceBtn.setBackground(Ui.ripple(0x1FFFFFFF, Ui.dp(this, 10), 0x33FFFFFF));
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 41) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startVoice();
+            } else {
+                Toast.makeText(this, "没有麦克风权限，用不了跟读", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     @Override
@@ -388,6 +517,15 @@ public class PromptActivity extends Activity implements PromptView.Listener {
             return;
         }
         applyImmersive();
+        if (voiceOn) {
+            if (!openMic()) {
+                voiceOn = false;
+                updateVoiceBtn();
+            }
+            view.pause();
+            updatePlayLabel();
+            return;
+        }
         if (!view.isFinished()) {
             view.play();
         }
@@ -400,12 +538,15 @@ public class PromptActivity extends Activity implements PromptView.Listener {
         if (view == null) {
             return;
         }
+        stopVoice();
         view.pause();
         handler.removeCallbacks(hideRunnable);
     }
 
     @Override
     protected void onDestroy() {
+        voiceOn = false;
+        stopVoice();
         handler.removeCallbacks(hideRunnable);
         super.onDestroy();
     }
