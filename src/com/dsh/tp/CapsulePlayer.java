@@ -1,7 +1,10 @@
 package com.dsh.tp;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
@@ -29,6 +32,7 @@ final class CapsulePlayer implements PromptView.Listener {
     private final WindowManager wm;
     private final FrameLayout root;
     private final PromptView prompt;
+    private RingView ring;
     private final WindowManager.LayoutParams params;
     private final GestureDetector gestures;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -71,8 +75,38 @@ final class CapsulePlayer implements PromptView.Listener {
                 Settings.MODE_HORIZONTAL);
         prompt.setListener(this);
         prompt.setStartChar(startChar);
-        root.addView(prompt, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        int ringSize = Ui.dp(ctx, 30);
+        int gap = Ui.dp(ctx, 10);
+        ring = new RingView(ctx, Ui.dp(ctx, 2.5f));
+
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        plp.rightMargin = ringSize + gap + Ui.dp(ctx, 2);
+        root.addView(prompt, plp);
+
+        FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(
+                ringSize, ringSize, Gravity.END | Gravity.CENTER_VERTICAL);
+        rlp.rightMargin = gap;
+        root.addView(ring, rlp);
+
+        // 两侧渐隐，文字进出更自然
+        View leftFade = new View(ctx);
+        leftFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xF2000000, 0x00F20000}));
+        FrameLayout.LayoutParams lf = new FrameLayout.LayoutParams(
+                Ui.dp(ctx, 16), FrameLayout.LayoutParams.MATCH_PARENT);
+        lf.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
+        root.addView(leftFade, lf);
+
+        View rightFade = new View(ctx);
+        rightFade.setBackground(new GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT,
+                new int[]{0xF2000000, 0x00F20000}));
+        FrameLayout.LayoutParams rf = new FrameLayout.LayoutParams(
+                Ui.dp(ctx, 16), FrameLayout.LayoutParams.MATCH_PARENT);
+        rf.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        rf.rightMargin = ringSize + gap;
+        root.addView(rightFade, rf);
 
         int type = Build.VERSION.SDK_INT >= 26
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -217,11 +251,59 @@ final class CapsulePlayer implements PromptView.Listener {
 
     @Override
     public void onProgress(float fraction, int line, int total) {
+        if (ring != null) {
+            ring.setTarget(fraction);
+        }
     }
 
     @Override
     public void onFinished() {
         // 胶囊里循环滚动，不打断
         prompt.restart();
+        if (ring != null) {
+            ring.setTarget(0f);
+        }
+    }
+
+    /** 环形进度：细描边，数值变化时平滑追上去。 */
+    private static final class RingView extends View {
+        private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF oval = new RectF();
+        private float target;
+        private float current;
+
+        RingView(Context c, int strokeWidth) {
+            super(c);
+            bgPaint.setStyle(Paint.Style.STROKE);
+            bgPaint.setStrokeWidth(strokeWidth);
+            bgPaint.setColor(0x33FFFFFF);
+            fgPaint.setStyle(Paint.Style.STROKE);
+            fgPaint.setStrokeWidth(strokeWidth);
+            fgPaint.setStrokeCap(Paint.Cap.ROUND);
+            fgPaint.setColor(0xFF4ADE80);
+        }
+
+        void setTarget(float p) {
+            target = Math.max(0f, Math.min(1f, p));
+            postInvalidateOnAnimation();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            float inset = fgPaint.getStrokeWidth() / 2f + 1f;
+            oval.set(inset, inset, getWidth() - inset, getHeight() - inset);
+            canvas.drawArc(oval, -90f, 360f, false, bgPaint);
+            if (current > 0.001f) {
+                canvas.drawArc(oval, -90f, 360f * current, false, fgPaint);
+            }
+            if (Math.abs(target - current) > 0.003f) {
+                current += (target - current) * 0.28f;
+                postInvalidateOnAnimation();
+            } else if (current != target) {
+                current = target;
+                postInvalidateOnAnimation();
+            }
+        }
     }
 }
