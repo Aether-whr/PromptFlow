@@ -64,6 +64,16 @@ public class PromptActivity extends Activity implements PromptView.Listener {
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // 真正铺满：允许画进刘海/挖孔区域，并且不受系统栏留白限制
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams wlp = getWindow().getAttributes();
+            wlp.layoutInDisplayCutoutMode = Build.VERSION.SDK_INT >= 30
+                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(wlp);
+        }
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         setRequestedOrientation(settings.orientation() == Settings.LANDSCAPE
                 ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
@@ -104,6 +114,20 @@ public class PromptActivity extends Activity implements PromptView.Listener {
                 getWindow().setDecorFitsSystemWindows(false);
             } catch (Throwable ignored) {
             }
+        }
+        if (Build.VERSION.SDK_INT >= 28) {
+            try {
+                WindowManager.LayoutParams wlp = getWindow().getAttributes();
+                wlp.layoutInDisplayCutoutMode = Build.VERSION.SDK_INT >= 30
+                        ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                        : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                getWindow().setAttributes(wlp);
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            getWindow().getDecorView().setFitsSystemWindows(false);
+        } catch (Throwable ignored) {
         }
         final View decor = getWindow().getDecorView();
         if (!decor.isAttachedToWindow()) {
