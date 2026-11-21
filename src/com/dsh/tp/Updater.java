@@ -29,8 +29,8 @@ final class Updater {
     }
 
     interface CheckCallback {
-        /** tag/notes/url 为 null 且 error 非空表示失败。 */
-        void done(String tag, String notes, String url, long size, String error);
+        /** tag 为 null 表示失败，此时 error 有值。 */
+        void done(String tag, String notes, String url, String apiUrl, long size, String error);
     }
 
     interface Progress {
@@ -47,13 +47,14 @@ final class Updater {
             c.setRequestProperty("User-Agent", "teleprompter-updater");
             int code = c.getResponseCode();
             if (code != 200) {
-                cb.done(null, null, null, 0, "GitHub 返回 " + code + "（可能是网络或频率限制）");
+                cb.done(null, null, null, null, 0, "GitHub 返回 " + code + "（可能是网络或频率限制）");
                 return;
             }
             JSONObject json = new JSONObject(readAll(c.getInputStream()));
             String tag = json.optString("tag_name", "");
             String notes = json.optString("body", "");
             String url = null;
+            String apiUrl = null;
             long size = 0;
             JSONArray assets = json.optJSONArray("assets");
             if (assets != null) {
@@ -65,14 +66,15 @@ final class Updater {
                     String name = a.optString("name", "").toLowerCase();
                     if (name.endsWith(".apk")) {
                         url = a.optString("browser_download_url", null);
+                        apiUrl = a.optString("url", null);
                         size = a.optLong("size", 0);
                         break;
                     }
                 }
             }
-            cb.done(tag, notes, url, size, null);
+            cb.done(tag, notes, url, apiUrl, size, null);
         } catch (Exception e) {
-            cb.done(null, null, null, 0, "连不上 GitHub：" + e.getClass().getSimpleName());
+            cb.done(null, null, null, null, 0, "连不上 GitHub：" + e.getClass().getSimpleName());
         } finally {
             if (c != null) {
                 c.disconnect();
@@ -80,7 +82,19 @@ final class Updater {
         }
     }
 
-    static void download(String url, File dest, Progress progress) throws IOException {
+    static void download(String url, String apiUrl, File dest, Progress progress) throws IOException {
+        try {
+            fetch(url, false, dest, progress);
+        } catch (IOException first) {
+            // github.com 有时候下不动，改走 API 的资源地址
+            if (apiUrl == null || apiUrl.equals(url)) {
+                throw first;
+            }
+            fetch(apiUrl, true, dest, progress);
+        }
+    }
+
+    private static void fetch(String url, boolean viaApi, File dest, Progress progress) throws IOException {
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(url).openConnection();
@@ -88,6 +102,9 @@ final class Updater {
             c.setConnectTimeout(15000);
             c.setReadTimeout(30000);
             c.setRequestProperty("User-Agent", "teleprompter-updater");
+            if (viaApi) {
+                c.setRequestProperty("Accept", "application/octet-stream");
+            }
             int code = c.getResponseCode();
             if (code != 200) {
                 throw new IOException("下载失败，HTTP " + code);

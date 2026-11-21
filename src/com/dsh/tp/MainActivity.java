@@ -255,7 +255,7 @@ public class MainActivity extends android.app.Activity {
                 Updater.check(new Updater.CheckCallback() {
                     @Override
                     public void done(final String tag, final String notes, final String url,
-                                     final long size, final String error) {
+                                     final String apiUrl, final long size, final String error) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
@@ -284,7 +284,7 @@ public class MainActivity extends android.app.Activity {
                                         .setPositiveButton("下载并安装", new android.content.DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(android.content.DialogInterface d, int w) {
-                                                startUpdate(url);
+                                                startUpdate(url, apiUrl);
                                             }
                                         })
                                         .show();
@@ -296,7 +296,7 @@ public class MainActivity extends android.app.Activity {
         }).start();
     }
 
-    private void startUpdate(final String url) {
+    private void startUpdate(final String url, final String apiUrl) {
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
             new AlertDialog.Builder(this)
                     .setTitle("需要安装权限")
@@ -329,7 +329,7 @@ public class MainActivity extends android.app.Activity {
             @Override
             public void run() {
                 try {
-                    Updater.download(url, dest, new Updater.Progress() {
+                    Updater.download(url, apiUrl, dest, new Updater.Progress() {
                         @Override
                         public void onProgress(final int percent) {
                             handler.post(new Runnable() {
