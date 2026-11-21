@@ -461,6 +461,24 @@ public class MainActivity extends android.app.Activity {
 
     // ---------------------------------------------------------------- 更新
 
+    private void requestNotifyPermission() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 42);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 42
+                && (grantResults.length == 0
+                || grantResults[0] != android.content.pm.PackageManager.PERMISSION_GRANTED)) {
+            toast("没有通知权限，状态栏显示不了");
+        }
+    }
+
     private void checkUpdate() {
         final AlertDialog checking = new AlertDialog.Builder(this)
                 .setTitle("检查更新")
@@ -976,6 +994,18 @@ public class MainActivity extends android.app.Activity {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         settings.mirror(checked);
+                    }
+                }));
+
+        // 状态栏胶囊
+        body.addView(switchRow("状态栏胶囊（实验，显示当前行）", settings.chipNotify(),
+                new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        settings.chipNotify(checked);
+                        if (checked) {
+                            requestNotifyPermission();
+                        }
                     }
                 }));
 

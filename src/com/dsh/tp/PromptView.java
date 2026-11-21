@@ -122,6 +122,15 @@ class PromptView extends View {
         return lineH > 0f ? Math.min(Math.max(1, lines.size()), (int) (offset / lineH) + 1) : 1;
     }
 
+    /** 当前屏幕顶部那一行的文字，给通知/胶囊用。 */
+    String currentLineText() {
+        if (horizontal() || lines.isEmpty() || lineH <= 0f) {
+            return "";
+        }
+        int idx = Math.max(0, Math.min(lines.size() - 1, (int) (offset / lineH)));
+        return lines.get(idx).trim();
+    }
+
     int totalLines() {
         return lines.size();
     }

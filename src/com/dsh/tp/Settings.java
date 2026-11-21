@@ -67,6 +67,15 @@ final class Settings {
         sp.edit().putInt("overlaySpeed", clamp(v, 1, 10)).apply();
     }
 
+    /** 是否在通知/状态栏显示当前行（实验性）。 */
+    boolean chipNotify() {
+        return sp.getBoolean("chipNotify", false);
+    }
+
+    void chipNotify(boolean v) {
+        sp.edit().putBoolean("chipNotify", v).apply();
+    }
+
     int playMode() {
         return sp.getInt("playMode", PLAY_FULLSCREEN);
     }

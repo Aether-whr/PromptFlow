@@ -420,6 +420,7 @@ final class OverlayPlayer implements PromptView.Listener {
     }
 
     private void detach() {
+        NotificationHelper.cancel(ctx);
         handler.removeCallbacks(hideTask);
         handler.removeCallbacks(singleTapTask);
         try {
@@ -448,6 +449,9 @@ final class OverlayPlayer implements PromptView.Listener {
 
     @Override
     public void onProgress(float fraction, int line, int total) {
+        if (settings.chipNotify()) {
+            NotificationHelper.update(ctx, prompt.currentLineText(), line, total, fraction);
+        }
         if (posBar == null || seeking) {
             return;
         }

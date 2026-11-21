@@ -536,6 +536,9 @@ public class PromptActivity extends Activity implements PromptView.Listener {
 
     @Override
     public void onProgress(float fraction, int line, int total) {
+        if (settings.chipNotify()) {
+            NotificationHelper.update(this, view.currentLineText(), line, total, fraction);
+        }
         if (!seeking) {
             posBar.setProgress(Math.round(fraction * 1000f));
         }
@@ -589,6 +592,7 @@ public class PromptActivity extends Activity implements PromptView.Listener {
 
     @Override
     protected void onDestroy() {
+        NotificationHelper.cancel(this);
         voiceOn = false;
         stopVoice();
         handler.removeCallbacks(hideRunnable);
