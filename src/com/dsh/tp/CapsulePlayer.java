@@ -36,6 +36,8 @@ final class CapsulePlayer implements PromptView.Listener {
     private final PromptView prompt;
     private RingView ring;
     private final WindowManager.LayoutParams params;
+    private final Settings settings;
+    private final int baseH;
     private final GestureDetector gestures;
     private final ScaleGestureDetector scaleDetector;
     private int winW;
@@ -64,12 +66,15 @@ final class CapsulePlayer implements PromptView.Listener {
 
     private CapsulePlayer(Context c, int startChar) {
         ctx = c.getApplicationContext();
-        Settings settings = new Settings(ctx);
+        settings = new Settings(ctx);
         wm = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
 
-        int w = Math.min((int) (dm.widthPixels * 0.66f), Ui.dp(ctx, 300));
-        int h = Ui.dp(ctx, 48);
+        float userScale = settings.capsuleScale();
+        int baseW = Math.min((int) (dm.widthPixels * 0.66f), Ui.dp(ctx, 300));
+        baseH = Ui.dp(ctx, 48);
+        int w = Math.min(dm.widthPixels, Math.round(baseW * userScale));
+        int h = Math.max(Ui.dp(ctx, 40), Math.round(baseH * userScale));
         winW = w;
         winH = h;
         minW = Ui.dp(ctx, 180);
@@ -166,6 +171,8 @@ final class CapsulePlayer implements PromptView.Listener {
 
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
+                // 记住这次缩放，下次开胶囊还是这个大小
+                settings.capsuleScale((float) winH / baseH);
             }
         });
         gestures = new GestureDetector(ctx, new GestureDetector.SimpleOnGestureListener() {

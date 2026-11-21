@@ -77,6 +77,16 @@ final class Settings {
         sp.edit().putBoolean("chipNotify", v).apply();
     }
 
+    /** 顶部胶囊的整体缩放，0.6 ~ 2.0。 */
+    float capsuleScale() {
+        return sp.getFloat("capsuleScale", 1f);
+    }
+
+    void capsuleScale(float v) {
+        float c = v < 0.6f ? 0.6f : (v > 2f ? 2f : v);
+        sp.edit().putFloat("capsuleScale", c).apply();
+    }
+
     int playMode() {
         return sp.getInt("playMode", PLAY_FULLSCREEN);
     }

@@ -953,6 +953,35 @@ public class MainActivity extends android.app.Activity {
         });
         body.addView(overlaySpeedBar);
 
+        // 顶部胶囊大小
+        final TextView capsuleLabel = sectionLabel(
+                "胶囊大小 " + Math.round(settings.capsuleScale() * 100f) + "%");
+        body.addView(capsuleLabel);
+        SeekBar capsuleBar = new SeekBar(this);
+        capsuleBar.setMax(140);
+        capsuleBar.setProgress(Math.max(0, Math.round(settings.capsuleScale() * 100f) - 60));
+        tintBar(capsuleBar, ACCENT);
+        capsuleBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) {
+                    return;
+                }
+                int pct = progress + 60;
+                settings.capsuleScale(pct / 100f);
+                capsuleLabel.setText("胶囊大小 " + pct + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar sb) {
+            }
+        });
+        body.addView(capsuleBar);
+
         // 字体
         body.addView(sectionLabel("字体"));
         fontChips.clear();
