@@ -149,12 +149,30 @@ public class MainActivity extends android.app.Activity {
         row.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        TextView importWord = new TextView(this);
+        importWord.setText("导入");
+        importWord.setTextSize(14);
+        importWord.setTextColor(0xFF1F7A4D);
+        importWord.setGravity(Gravity.CENTER);
+        importWord.setPadding(Ui.dp(this, 12), Ui.dp(this, 7), Ui.dp(this, 12), Ui.dp(this, 7));
+        importWord.setBackground(Ui.ripple(0xFFE6F5EC, Ui.dp(this, 20), 0x3320A060));
+        importWord.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickWord();
+            }
+        });
+        LinearLayout.LayoutParams iwp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        iwp.rightMargin = Ui.dp(this, 8);
+        row.addView(importWord, iwp);
+
         TextView save = new TextView(this);
         save.setText("保存");
         save.setTextSize(14);
         save.setTextColor(ACCENT);
         save.setGravity(Gravity.CENTER);
-        save.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        save.setPadding(Ui.dp(this, 12), Ui.dp(this, 7), Ui.dp(this, 12), Ui.dp(this, 7));
         save.setBackground(Ui.ripple(0xFFE9F0FE, Ui.dp(this, 20), 0x332F6FED));
         save.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -172,7 +190,7 @@ public class MainActivity extends android.app.Activity {
         clear.setTextSize(14);
         clear.setTextColor(0xFF8A6A22);
         clear.setGravity(Gravity.CENTER);
-        clear.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        clear.setPadding(Ui.dp(this, 12), Ui.dp(this, 7), Ui.dp(this, 12), Ui.dp(this, 7));
         clear.setBackground(Ui.ripple(0xFFFDF3DC, Ui.dp(this, 20), 0x33A57500));
         clear.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -190,7 +208,7 @@ public class MainActivity extends android.app.Activity {
         gear.setTextSize(14);
         gear.setTextColor(0xFF4A5160);
         gear.setGravity(Gravity.CENTER);
-        gear.setPadding(Ui.dp(this, 14), Ui.dp(this, 7), Ui.dp(this, 14), Ui.dp(this, 7));
+        gear.setPadding(Ui.dp(this, 12), Ui.dp(this, 7), Ui.dp(this, 12), Ui.dp(this, 7));
         gear.setBackground(Ui.ripple(0xFFFFFFFF, Ui.dp(this, 20), 0x22000000));
         gear.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -695,6 +713,69 @@ public class MainActivity extends android.app.Activity {
             }
         });
         sheet.show();
+    }
+
+    private static final int REQ_WORD = 61;
+
+    private void pickWord() {
+        try {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/msword",
+                    "application/octet-stream"
+            });
+            startActivityForResult(i, REQ_WORD);
+        } catch (Exception e) {
+            toast("打不开文件选择器：" + e.getClass().getSimpleName());
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_WORD || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        final Uri uri = data.getData();
+        if (uri == null) {
+            return;
+        }
+        toast("正在读取 Word…");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String text = null;
+                String error = null;
+                try {
+                    text = WordImport.read(MainActivity.this, uri);
+                } catch (Exception e) {
+                    error = e.getClass().getSimpleName();
+                }
+                final String finalText = text;
+                final String finalError = error;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (finalError != null) {
+                            toast("读取失败：" + finalError);
+                            return;
+                        }
+                        if (finalText == null || finalText.trim().isEmpty()) {
+                            toast("没读到文字，可能是旧的 .doc 格式，另存为 .docx 再试");
+                            return;
+                        }
+                        input.setText(finalText);
+                        settings.text(finalText);
+                        input.setSelection(input.getText().length());
+                        updateCounter(input.getText().length());
+                        toast("已导入 " + finalText.length() + " 字");
+                    }
+                });
+            }
+        }).start();
     }
 
     private void startPlayback(boolean fromCursor) {
@@ -1203,10 +1284,13 @@ public class MainActivity extends android.app.Activity {
     private LinearLayout chipRow(List<TextView> chips) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setClipChildren(false);
+        row.setClipToPadding(false);
+        row.setPadding(0, Ui.dp(this, 2), 0, Ui.dp(this, 2));
         for (int i = 0; i < chips.size(); i++) {
             TextView c = chips.get(i);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 38));
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 40));
             if (i > 0) {
                 lp.leftMargin = Ui.dp(this, 8);
             }
@@ -1219,6 +1303,7 @@ public class MainActivity extends android.app.Activity {
         TextView t = new TextView(this);
         t.setText(text);
         t.setTextSize(14);
+        t.setIncludeFontPadding(false);
         t.setGravity(Gravity.CENTER);
         t.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         styleChip(t, selected);
