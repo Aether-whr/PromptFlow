@@ -1,6 +1,6 @@
-# 提词器 (Teleprompter)
+# Eyeline
 
-一个极简的安卓原生提词器，纯 Android Views 手写界面，无第三方依赖，APK 只有 30 KB 左右。
+Eyeline · 一个极简的安卓原生提词器，纯 Android Views 手写界面，无第三方依赖，APK 只有 30 KB 左右。
 
 ## 功能
 

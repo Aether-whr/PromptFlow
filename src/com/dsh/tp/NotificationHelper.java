@@ -30,7 +30,7 @@ final class NotificationHelper {
         if (nm == null || nm.getNotificationChannel(CHANNEL) != null) {
             return;
         }
-        NotificationChannel ch = new NotificationChannel(CHANNEL, "提词进度",
+        NotificationChannel ch = new NotificationChannel(CHANNEL, "Eyeline 进度",
                 NotificationManager.IMPORTANCE_DEFAULT);
         ch.setShowBadge(false);
         ch.enableVibration(false);

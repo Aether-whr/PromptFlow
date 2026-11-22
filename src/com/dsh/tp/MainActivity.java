@@ -158,7 +158,7 @@ public class MainActivity extends android.app.Activity {
         row.setPadding(Ui.dp(this, 2), 0, 0, Ui.dp(this, 8));
 
         TextView title = new TextView(this);
-        title.setText("提词器");
+        title.setText("Eyeline");
         title.setTextSize(24);
         title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         title.setTextColor(INK);
